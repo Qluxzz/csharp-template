@@ -84,3 +84,17 @@ This analyzer forces you to either catch exceptions within your method, or annot
 ## Nullable.Extended.Analyzer
 
 This analyzer forbids the null forgiving operator, using it indicates a modelling issue, if you want to say that you know this not to be null at this point, why don't you model your types correctly so they cannot be null at this point? Usually however using the following `?? throw new Exception("include as much info you need to debug the issue if it unexpectedly was null here")` is a much better solution to using the null forgiving operator which will just result in a NullReferenceException without any info to how the object looked at the time of the exception
+
+# General
+
+## .Single and .First considered harmful
+
+The .Single and .First methods of an IEnumerable makes it very convenient to validate that there are at least one element or just a single element in a list.
+
+These two methods however have a big downside, which is debuggability. When .Single or .First fails, you will get an InvalidOperationException with no more info, which means trying to debug for what thing the list failed this condition is hard.
+
+It's always better to use the following pattern:
+
+```csharp
+var singleItem = obj.With.Deeply.Nested.List.SingleOrDefault() ?? throw new UnreachableException($"We always expected this list to contain a single element, here's the entire object so you can debug it and discuss if this should be possible or if it's the cause of a deeper problem. Data: {JsonSerializer.Serialize(obj)}");
+```
