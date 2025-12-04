@@ -14,7 +14,7 @@ public static class Extensions
             allowIntegerValues: false
         );
 
-    public static IServiceCollection AddSwagger(IServiceCollection services)
+    public static IServiceCollection AddSwagger(this IServiceCollection services)
     {
         // JSON OPTIONS
         // https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/2293
@@ -50,7 +50,7 @@ public static class Extensions
         return services;
     }
 
-    public static WebApplication UseSwagger(WebApplication app)
+    public static IApplicationBuilder UseDefaultSwagger(this IApplicationBuilder app)
     {
         app.UseSwagger();
         app.UseSwaggerUI(options =>
