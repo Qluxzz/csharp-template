@@ -1,0 +1,70 @@
+﻿using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Shared.Swagger;
+
+public static class Extensions
+{
+    private static readonly JsonStringEnumConverter _jsonStringEnumConverter =
+        new JsonStringEnumConverter(
+            namingPolicy: JsonNamingPolicy.CamelCase,
+            allowIntegerValues: false
+        );
+
+    public static IServiceCollection AddSwagger(IServiceCollection services)
+    {
+        // JSON OPTIONS
+        // https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/2293
+
+        // This makes Swagger report the enums as strings
+        services
+            .AddControllers()
+            .AddJsonOptions(options =>
+                options.JsonSerializerOptions.Converters.Add(_jsonStringEnumConverter)
+            );
+
+        // This is required for the controllers to actually return them as strings
+        services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+            options.SerializerOptions.Converters.Add(_jsonStringEnumConverter)
+        );
+
+        services.AddSwaggerGen(options =>
+        {
+            // TODO(.NET 10): Swashbuckle will then correctly infer the return types from TypedResults so this can be removed
+            // https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/2595#issuecomment-2967392149
+            options.OperationFilter<Vernou.Swashbuckle.HttpResultsAdapter.HttpResultsOperationFilter>();
+
+            // This makes it so doc comments is included in the generated swagger
+            var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+
+            // When generating TypeScript types from the Swagger spec, this is required to get the correct null value handling
+            // By default all properties are generated as optional
+            options.AddSchemaFilterInstance(new MakeAllPropertiesRequired());
+            options.SupportNonNullableReferenceTypes();
+        });
+
+        return services;
+    }
+
+    public static WebApplication UseSwagger(WebApplication app)
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI(options =>
+        {
+            options.DefaultModelsExpandDepth(3);
+            options.DefaultModelExpandDepth(3);
+            // The most common use case when we use Swagger is to try it out instead of looking at the types, since we're using type generation
+            // So having this enabled by default makes it one less click to test the endpoints
+            options.EnableTryItOutByDefault();
+            // This makes it so if you reload the Swagger page, you don't have to enter your credentials again (if using credentials)
+            // However, if you get a 401 you need to manually clear the token and re-enter your new ones.
+            options.EnablePersistAuthorization();
+        });
+
+        return app;
+    }
+}
