@@ -12,6 +12,59 @@ Controllers should always be using [Results type](https://learn.microsoft.com/en
 
 IActionResult or IAction has no typing information and it's up to you as the developer to annotate your method with `[ProducesResponseType]` attributes and remember to update these whenever the endpoint has changed, otherwise you're lying to the consumer. Using Results removes this possibility entirely.
 
+## Error handling in controllers
+
+A common pattern I've seen is:
+
+```csharp
+public async Task<Results<Ok, StatusCodeHttpResult>> MyEndpoint()
+{
+    try
+    {
+        var result = await DoSomething();
+        return TypedResults.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error while calling the DoSomething function.");
+        return TypedResults.StatusCode(500);
+    }
+}
+```
+
+On the surface this looks okay, we're hiding the real error so we don't leak any implementation details. The downside of this obfuscation is that it's always active, regardless of what ASPNETCORE_ENVIRONMENT you're running. That means if you're running everything locally, or you're a frontender working against a shared dev environment, you won't have a clue as to what went wrong and have to bug the backend programmer to read the logs.
+
+What if we only could have this obfuscation enabled in production, but not in development?
+
+With a [custom exception handler](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0#exception-handler-lambda) we can do just that. So now your controller method looks like this:
+
+```csharp
+public async Task MyEndpoint()
+{
+    var result = await DoSomething();
+    return Ok(result);
+}
+```
+
+And in your Program.cs file you instead have this:
+
+```csharp
+if (app.Environment.IsProduction())
+{
+    // Catch all unhandled exceptions and just return a non descriptive "Internal Server Error" message
+    app.UseExceptionHandler(exceptionHandlerApp =>
+    {
+        exceptionHandlerApp.Run(async context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = Text.Plain;
+
+            await context.Response.WriteAsync("Internal Server Error");
+        });
+    });
+}
+```
+
 # Formatting
 
 [CSharpier](https://csharpier.com/) is an opinionated code formatter, think Prettier but for C#. The reasoning behind using CSharpier is the same with using Prettier, I don't care about the formatting as long as everyone formats their code the same way and I want it to be automatically formatted. This helps out tremendously in code reviews where you can see clearly what has changed instead of someone adding a line break somewhere.
