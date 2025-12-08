@@ -8,11 +8,28 @@ namespace Shared.Swagger;
 
 public static class Extensions
 {
-    private static readonly JsonStringEnumConverter _jsonStringEnumConverter =
-        new JsonStringEnumConverter(
-            namingPolicy: JsonNamingPolicy.CamelCase,
-            allowIntegerValues: false
-        );
+    private static readonly JsonNamingPolicy _defaultNamingPolicy = JsonNamingPolicy.CamelCase;
+
+    private static readonly JsonStringEnumConverter _jsonStringEnumConverter = new(
+        namingPolicy: _defaultNamingPolicy,
+        allowIntegerValues: false
+    );
+
+    /// <exception cref="NotSupportedException">Should never happen</exception>
+    private static JsonSerializerOptions DefaultOptions(JsonSerializerOptions options)
+    {
+        // All parameters in the constructor must exist in the JSON
+        options.RespectRequiredConstructorParameters = true;
+        // Always serialize as camelCase
+        options.PropertyNamingPolicy = _defaultNamingPolicy;
+        // Ignore casing during deserialization, since we don't always own the API we're calling, we can't enforce their casing.
+        // If the API you're calling is using something like snake_case or kebab-case or another not just casing based naming policy,
+        options.PropertyNameCaseInsensitive = true;
+
+        options.Converters.Add(_jsonStringEnumConverter);
+
+        return options;
+    }
 
     public static IServiceCollection AddSwagger(this IServiceCollection services)
     {
@@ -22,13 +39,11 @@ public static class Extensions
         // This makes Swagger report the enums as strings
         services
             .AddControllers()
-            .AddJsonOptions(options =>
-                options.JsonSerializerOptions.Converters.Add(_jsonStringEnumConverter)
-            );
+            .AddJsonOptions(options => DefaultOptions(options.JsonSerializerOptions));
 
         // This is required for the controllers to actually return them as strings
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
-            options.SerializerOptions.Converters.Add(_jsonStringEnumConverter)
+            DefaultOptions(options.SerializerOptions)
         );
 
         services.AddSwaggerGen(options =>
