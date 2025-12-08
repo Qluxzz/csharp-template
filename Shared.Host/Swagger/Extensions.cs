@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Shared.Swagger;
+namespace Shared.Host.Swagger;
 
 public static class Extensions
 {
@@ -31,7 +31,10 @@ public static class Extensions
         return options;
     }
 
-    public static IServiceCollection AddSwagger(this IServiceCollection services)
+    public static IServiceCollection AddSwagger(
+        this IServiceCollection services,
+        Action<Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions>? custom = null
+    )
     {
         // JSON OPTIONS
         // https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/2293
@@ -39,7 +42,9 @@ public static class Extensions
         // This makes Swagger report the enums as strings
         services
             .AddControllers()
-            .AddJsonOptions(options => DefaultOptions(options.JsonSerializerOptions));
+            .AddJsonOptions(options =>
+                options.JsonSerializerOptions.Converters.Add(_jsonStringEnumConverter)
+            );
 
         // This is required for the controllers to actually return them as strings
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
@@ -60,6 +65,9 @@ public static class Extensions
             // By default all properties are generated as optional
             options.AddSchemaFilterInstance(new MakeAllPropertiesRequired());
             options.SupportNonNullableReferenceTypes();
+
+            if (custom is not null)
+                custom(options);
         });
 
         return services;

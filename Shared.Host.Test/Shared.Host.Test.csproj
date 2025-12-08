@@ -21,6 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Shared.Swagger\Shared.Swagger.csproj" />
+    <ProjectReference Include="..\Shared.Host\Shared.Host.csproj" />
   </ItemGroup>
 </Project>

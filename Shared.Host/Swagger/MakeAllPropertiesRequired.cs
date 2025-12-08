@@ -1,7 +1,7 @@
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
-namespace Shared.Swagger;
+namespace Shared.Host.Swagger;
 
 /// <summary>
 /// Filter that makes all response properties required
