@@ -87,6 +87,47 @@ This analyzer forbids the null forgiving operator, using it indicates a modellin
 
 # General
 
+## Public Setters considered harmful
+
+Much of the C# code I see has objects modeled as this:
+
+```csharp
+public class Foo {
+    public int Bar { get; set; }
+    public int Baz { get; set; }
+    ...
+}
+```
+
+So why is this a problem? Well, having setters on all properties means anything you send your object to can mutate your instance. This is also something you can't annotate on your method, that you will mutate the instance you pass.
+
+If you don't see a problem with this, I'm sorry and I suggest you try out working in a functional language, where you can't mutate data and come back when you've been enlightened.
+
+Before records, my classes looked as this:
+
+```csharp
+public class Foo {
+    public int Bar { get; }
+    public int Baz { get; }
+    ...
+
+    public Foo(int bar, int baz) {
+        Bar = bar;
+        Baz = baz;
+    }
+}
+```
+
+Which means the values for Bar and Baz can only be set once, when creating an instance of Foo, after that they are read only. With records (ignoring their own flavor of footguns), the equivalent is:
+
+```csharp
+public record Foo(int Bar, int Baz);
+```
+
+## Parse don't validate, primitive obsession
+
+https://gist.github.com/Qluxzz/706043bc37d0d1030e1cd9d3841918f5
+
 ## .Single and .First considered harmful
 
 The .Single and .First methods of an IEnumerable makes it very convenient to validate that there are at least one element or just a single element in a list.
@@ -97,4 +138,56 @@ It's always better to use the following pattern:
 
 ```csharp
 var singleItem = obj.With.Deeply.Nested.List.SingleOrDefault() ?? throw new UnreachableException($"We always expected this list to contain a single element, here's the entire object so you can debug it and discuss if this should be possible or if it's the cause of a deeper problem. Data: {JsonSerializer.Serialize(obj)}");
+```
+
+## System.Text.Json.JsonSerializer.DeserializeAsync can return null, and doesn't validate that our defined fields were included in the json payload
+
+The signature for `System.Text.Json.JsonSerializer.Deserialize<T>` is `T?`, so when does this actually return null? If `T` isn't the correct object? No, it only returns null when the JSON value you're trying to deserialize is literally `null`, never else can this return null. If you try to deserialize an invalid value, the value will be default value for the type, and not fail.
+
+```csharp
+record Test(int Value);
+
+System.Text.Json.JsonSerializer.Deserialize<Test>("null") // null
+System.Text.Json.JsonSerializer.Deserialize<Test>("""{"x":10}""") // Test { Value = 0 }
+```
+
+So how can we enforce that we deserialized what we said we wanted? Well, for null, you can't enforce that you get T and not T?, other than checking and throwing your own exception if the result is null, something like:
+
+```csharp
+System.Text.Json.JsonSerializer.Deserialize<Test>("null") ?? throw new UnreachableException("The Json data was literally \"null\"")
+```
+
+And wrap that in a proxy for all Deserialize methods the JsonSerializer exposes, and then forbid the usage of the normal method using the [Roslyn banned api analyzer](https://github.com/dotnet/roslyn/blob/main/src/RoslynAnalyzers/Microsoft.CodeAnalysis.BannedApiAnalyzers/BannedApiAnalyzers.Help.md).
+
+For non empty json data, if you've been following my advice of never having any public setters and having constructors in all your classes, you can get this by just enabling `RespectRequiredConstructorParameters` in the `JsonSerializerOptions`
+
+```csharp
+
+// Class
+public class TestClass {
+    public int Value { get; } // See, no setter, can only be set once, when decoding the object
+
+    public TestClass(int value) {
+        Value = value;
+    }
+}
+
+System.Text.Json.JsonSerializer.Deserialize<TestClass>(
+    """{"x":10}""",
+    new JsonSerializerOptions() {
+        RespectRequiredConstructorParameters = true
+    }
+); // JsonException "JSON deserialization for type 'Test' was missing required properties including: 'Value'.
+
+
+// Record
+record TestRecord(int Value);
+
+System.Text.Json.JsonSerializer.Deserialize<Test>(
+    """{"x":10}""",
+    new System.Text.Json.JsonSerializerOptions() {
+        RespectRequiredConstructorParameters = true
+    }
+) // JSON deserialization for type 'Test' was missing required properties including: 'Value'.
+
 ```
