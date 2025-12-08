@@ -13,7 +13,7 @@ var myClone = new Test("André", 30);
 me == myClone // true
 ```
 
-When using something that does not implement IEquality, like a list of strings, you can't compare use == to compare the instances anymore.
+When if your record contains something that does not implement IEquality, like a list of strings, you can't use == to compare the instances anymore.
 
 ```csharp
 record Test(string Name, int Age, List<string> Hobbies);
@@ -25,6 +25,8 @@ me == myClone // false
 ```
 
 This is because a list is a reference type and we're creating a new list for each instance.
+
+Just to drive this home, here is an example where we create the list once, and reuse it for both instances. Now the records are equal again.
 
 ```csharp
 record Test(string Name, int Age, List<string> Hobbies);
