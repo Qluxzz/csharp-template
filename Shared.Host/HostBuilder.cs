@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,9 +26,7 @@ public class SharedHostBuilder
 {
     private bool _useSwagger = false;
 
-    [MemberNotNullWhen(true, nameof(_signalRSettings))]
     private bool _useSignalR { get; set; }
-    private SignalRSettings? _signalRSettings = null;
 
     [MemberNotNullWhen(true, nameof(_bearerTokenSettings))]
     private bool _useBearerToken { get; set; }
@@ -39,13 +38,17 @@ public class SharedHostBuilder
         return this;
     }
 
-    public SharedHostBuilder WithSignalR(params KeyValuePair<Hub, string>[] hubs)
+    public SharedHostBuilder WithSignalR()
     {
         _useSignalR = true;
-        _signalRSettings = new SignalRSettings(hubs.ToDictionary());
         return this;
     }
 
+    /// <summary>
+    /// Makes it so all endpoints require an authenticated user.
+    /// </summary>
+    /// <param name="settings"></param>
+    /// <returns></returns>
     public SharedHostBuilder WithBearerToken(BearerTokenSettings settings)
     {
         _useBearerToken = true;
@@ -57,19 +60,16 @@ public class SharedHostBuilder
     {
         var options = new WebApplicationOptions() { };
 
-        var builder = WebApplication.CreateEmptyBuilder(options);
+        var builder = WebApplication.CreateSlimBuilder(options);
 
         builder.Services.AddRouting();
+
+        builder.WebHost.UseUrls("http://localhost:8080");
 
         if (_useSwagger)
         {
             void Custom(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)
             {
-                if (_useSignalR)
-                {
-                    options.AddSignalRSwaggerGen();
-                }
-
                 if (_useBearerToken)
                 {
                     options.AddSecurityDefinition(
@@ -104,6 +104,11 @@ public class SharedHostBuilder
                             },
                         }
                     );
+                }
+
+                if (_useSignalR)
+                {
+                    options.AddSignalRSwaggerGen();
                 }
             }
             builder.Services.AddSwagger(Custom);
@@ -182,9 +187,6 @@ public class SharedHostBuilder
         if (app.Environment.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
-            app.UseCors(builder =>
-                builder.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin().AllowCredentials()
-            );
         }
         else
         {
@@ -212,27 +214,6 @@ public class SharedHostBuilder
             app.UseDefaultSwagger();
         }
 
-        if (_useSignalR)
-        {
-            var mapHubMethod = typeof(HubEndpointRouteBuilderExtensions)
-                .GetMethods()
-                .Single(m =>
-                    m.Name == "MapHub"
-                    && m.IsGenericMethodDefinition
-                    && m.GetParameters().Length == 2
-                );
-
-            foreach (var hub in _signalRSettings.Hubs)
-            {
-                try
-                {
-                    var generic = mapHubMethod.MakeGenericMethod(hub.Key.GetType());
-                    generic.Invoke(null, [app, hub.Value]);
-                }
-                catch { }
-            }
-        }
-
         return new(app);
     }
 }
@@ -254,6 +235,9 @@ public class SharedHost(WebApplication webApplication) : IHost
 
     public RouteHandlerBuilder MapGet(string pattern, Delegate handler) =>
         _webApplication.MapGet(pattern, handler);
+
+    public HubEndpointConventionBuilder MapHub<T>(string pattern)
+        where T : Hub => _webApplication.MapHub<T>(pattern);
 
 #pragma warning disable VSTHRD110 // Observe result of async calls
     void IDisposable.Dispose() => _webApplication.DisposeAsync();
