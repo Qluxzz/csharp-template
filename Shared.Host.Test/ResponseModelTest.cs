@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting.Server;
+﻿using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,7 +7,7 @@ using Microsoft.OpenApi.Any;
 
 namespace Shared.Host.Test;
 
-public class UnitTest1
+public class ResponseModelTest
 {
     [Fact]
     public async Task EnumsShouldBeReturnedAsStrings()
