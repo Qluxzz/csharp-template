@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
@@ -25,14 +26,12 @@ public class SharedHostBuilder
     private bool _useSwagger = false;
 
     [MemberNotNullWhen(true, nameof(_signalRSettings))]
-    private bool UseSignalR { get; set; }
+    private bool _useSignalR { get; set; }
     private SignalRSettings? _signalRSettings = null;
 
     [MemberNotNullWhen(true, nameof(_bearerTokenSettings))]
-    private bool UseBearerToken { get; set; }
+    private bool _useBearerToken { get; set; }
     private BearerTokenSettings? _bearerTokenSettings = null;
-
-    private bool _useRouting { get; set; }
 
     public SharedHostBuilder WithSwagger()
     {
@@ -42,21 +41,15 @@ public class SharedHostBuilder
 
     public SharedHostBuilder WithSignalR(params KeyValuePair<Hub, string>[] hubs)
     {
-        UseSignalR = true;
+        _useSignalR = true;
         _signalRSettings = new SignalRSettings(hubs.ToDictionary());
         return this;
     }
 
     public SharedHostBuilder WithBearerToken(BearerTokenSettings settings)
     {
-        UseBearerToken = true;
+        _useBearerToken = true;
         _bearerTokenSettings = settings;
-        return this;
-    }
-
-    public SharedHostBuilder UseRouting()
-    {
-        _useRouting = true;
         return this;
     }
 
@@ -66,16 +59,18 @@ public class SharedHostBuilder
 
         var builder = WebApplication.CreateEmptyBuilder(options);
 
+        builder.Services.AddRouting();
+
         if (_useSwagger)
         {
             void Custom(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)
             {
-                if (UseSignalR)
+                if (_useSignalR)
                 {
                     options.AddSignalRSwaggerGen();
                 }
 
-                if (UseBearerToken)
+                if (_useBearerToken)
                 {
                     options.AddSecurityDefinition(
                         "Bearer",
@@ -114,12 +109,12 @@ public class SharedHostBuilder
             builder.Services.AddSwagger(Custom);
         }
 
-        if (UseSignalR)
+        if (_useSignalR)
         {
             builder.Services.AddSignalR(o => o.EnableDetailedErrors = true);
         }
 
-        if (UseBearerToken)
+        if (_useBearerToken)
         {
             builder
                 .Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -136,7 +131,7 @@ public class SharedHostBuilder
                         IssuerSigningKey = _bearerTokenSettings.SigningKey,
                     };
 
-                    if (UseSignalR)
+                    if (_useSignalR)
                     {
                         // We have to hook the OnMessageReceived event in order to
                         // allow the JWT authentication handler to read the access
@@ -166,12 +161,17 @@ public class SharedHostBuilder
                     }
                 });
 
-            builder.Services.AddAuthorization();
+            // Require Authorization for all endpoints
+            // Use [AllowAnonymous] to override for specific endpoints
+            builder.Services.AddAuthorization(options =>
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build()
+            );
         }
 
         // Registering services is not dependant on the order
-        if (customServices is not null)
-            customServices(builder.Services);
+        customServices?.Invoke(builder.Services);
 
         var app = builder.Build();
 
@@ -200,7 +200,7 @@ public class SharedHostBuilder
             );
         }
 
-        if (UseBearerToken)
+        if (_useBearerToken)
         {
             app.UseAuthentication();
             app.UseAuthorization();
@@ -211,10 +211,7 @@ public class SharedHostBuilder
             app.UseDefaultSwagger();
         }
 
-        if (_useRouting)
-            app.UseRouting();
-
-        if (UseSignalR)
+        if (_useSignalR)
         {
             var mapHubMethod = typeof(HubEndpointRouteBuilderExtensions)
                 .GetMethods()

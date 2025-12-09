@@ -15,7 +15,6 @@ public class UnitTest1
     {
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .UseRouting()
             .Build(services =>
             {
                 // This is what .UseTestServer does
@@ -39,7 +38,6 @@ public class UnitTest1
     {
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .UseRouting()
             .Build(services =>
             {
                 // This is what .UseTestServer does
@@ -86,17 +84,4 @@ public class UnitTest1
     }
 
     public record TestWithEnum(TestEnum TestEnum);
-
-    class NoopHostLifetime : IHostLifetime
-    {
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task WaitForStartAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-    }
 }
