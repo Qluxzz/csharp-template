@@ -169,11 +169,7 @@ public class SharedHostBuilder
             // Require Authorization for all endpoints
             // Use [AllowAnonymous] to override for specific endpoints
             var policy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
-
-            builder
-                .Services.AddAuthorizationBuilder()
-                .SetFallbackPolicy(policy)
-                .SetDefaultPolicy(policy);
+            builder.Services.AddAuthorizationBuilder().SetFallbackPolicy(policy);
         }
 
         // Registering services is not dependant on the order
