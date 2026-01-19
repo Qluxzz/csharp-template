@@ -85,6 +85,10 @@ This analyzer forces you to either catch exceptions within your method, or annot
 
 This analyzer forbids the null forgiving operator, using it indicates a modelling issue, if you want to say that you know this not to be null at this point, why don't you model your types correctly so they cannot be null at this point? Usually however using the following `?? throw new Exception("include as much info you need to debug the issue if it unexpectedly was null here")` is a much better solution to using the null forgiving operator which will just result in a NullReferenceException without any info to how the object looked at the time of the exception
 
+# Background Services
+
+Background services doesn't make use of the unhandled exception middleware, so if an exception is thrown in one, it will by default kill the host. This can be changed to only kill the background service itself but that's something you probably don't want either. So always remember to wrap your calling code in a try catch so it won't be killed by an unexpected exception.
+
 # General
 
 ## Public Setters considered harmful
