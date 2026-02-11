@@ -195,3 +195,15 @@ System.Text.Json.JsonSerializer.Deserialize<Test>(
 ) // JSON deserialization for type 'Test' was missing required properties including: 'Value'.
 
 ```
+
+# Entity Framework
+
+## PostgreSQL
+
+Entity Framework by default creates all tables and columns using Pascal Case casing.
+
+For PostgreSQL specifically, this forces double-quotes to be added since unquoted identifiers are automatically converted to lower-case, and the intellisense usually stops working entirely depending on what tool you're using, it tries to autocomplete it wrong.
+
+For this case you can use https://github.com/efcore/EFCore.NamingConventions and make it so all tables, column, indexes are created using snake_case instead.
+
+Just be mindful of ASP.NET Identity and other libraries that override this behavior in the onModelCreating method of the context. https://github.com/efcore/EFCore.NamingConventions/issues/2
