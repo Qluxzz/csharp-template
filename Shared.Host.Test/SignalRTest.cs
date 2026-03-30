@@ -2,17 +2,10 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Any;
-using SignalRSwaggerGen.Attributes;
-using SignalRSwaggerGen.Enums;
 
 namespace Shared.Host.Test;
 
@@ -109,6 +102,7 @@ public class SignalRTest
             new Claim("role", "admin"),
         };
 
+#pragma warning disable RS0030 // Do not use banned APIs, required by contract
         var token = new JwtSecurityToken(
             issuer: "test",
             audience: "test-api",
@@ -116,6 +110,7 @@ public class SignalRTest
             expires: DateTime.UtcNow.AddDays(30),
             signingCredentials: creds
         );
+#pragma warning restore RS0030 // Do not use banned APIs
 
         return (key, new JwtSecurityTokenHandler().WriteToken(token));
     }

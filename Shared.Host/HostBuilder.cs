@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Shared.Host.Swagger;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -72,12 +72,15 @@ public class SharedHostBuilder
             {
                 if (_useBearerToken)
                 {
+                    // This allows you to impersonate users by supplying their bearer token directly
+                    const string impersonateUser = "Impersonate user";
+
                     options.AddSecurityDefinition(
-                        "Bearer",
+                        impersonateUser,
                         new OpenApiSecurityScheme
                         {
                             Description =
-                                "JWT Authorization header using the Bearer scheme.\nEnter your token in the text input below.",
+                                "Here you can use a token directly to impersonate another user if you have their token",
                             Name = "Authorization",
                             In = ParameterLocation.Header,
                             Type = SecuritySchemeType.Http,
@@ -85,25 +88,11 @@ public class SharedHostBuilder
                             BearerFormat = "JWT",
                         }
                     );
-                    options.AddSecurityRequirement(
-                        new OpenApiSecurityRequirement()
-                        {
-                            {
-                                new OpenApiSecurityScheme
-                                {
-                                    Reference = new OpenApiReference
-                                    {
-                                        Type = ReferenceType.SecurityScheme,
-                                        Id = "Bearer",
-                                    },
-                                    Scheme = "oauth2",
-                                    Name = "Bearer",
-                                    In = ParameterLocation.Header,
-                                },
-                                new List<string>()
-                            },
-                        }
-                    );
+
+                    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+                    {
+                        [new OpenApiSecuritySchemeReference(impersonateUser, document)] = [],
+                    });
                 }
 
                 if (_useSignalR)

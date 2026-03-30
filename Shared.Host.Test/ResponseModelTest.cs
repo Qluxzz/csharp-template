@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.OpenApi.Any;
+using Microsoft.OpenApi.Reader;
 
 namespace Shared.Host.Test;
 
@@ -50,29 +50,29 @@ public class ResponseModelTest
 
         await host.StartAsync(CancellationToken.None);
 
-        var response = await host.GetTestClient().GetStringAsync("/swagger/v1/swagger.json");
+        var response = await host.GetTestClient().GetByteArrayAsync("/swagger/v1/swagger.json");
 
-        var document = new Microsoft.OpenApi.Readers.OpenApiStringReader().Read(
-            response,
-            out var diagnostic
-        );
+        using var stream = new MemoryStream(response);
+
+        var reader = new OpenApiJsonReader();
+
+        var (document, diagnostic) = reader.Read(stream, new Uri("http://localhost"), new());
 
         Assert.NotNull(diagnostic);
         Assert.Empty(diagnostic.Warnings);
 
         Assert.NotNull(document);
+        Assert.NotNull(document.Components);
+        Assert.NotNull(document.Components.Schemas);
         Assert.NotEmpty(document.Components.Schemas);
         Assert.NotEmpty(document.Paths);
         var schema = Assert.Contains("TestEnum", document.Components.Schemas);
+        Assert.NotNull(schema.Enum);
         Assert.Equivalent(
-            new List<IOpenApiAny>([
-                new OpenApiString("foo"),
-                new OpenApiString("bar"),
-                new OpenApiString("baz"),
-            ]),
-            schema.Enum
+            new List<string>() { "foo", "bar", "baz" },
+            schema.Enum.Select(x => x.GetValue<string>())
         );
-        Assert.Equal("string", schema.Type);
+        Assert.Equal(Microsoft.OpenApi.JsonSchemaType.String, schema.Type);
     }
 
     public enum TestEnum

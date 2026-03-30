@@ -82,6 +82,7 @@ public class AuthenticationTest
             new Claim("role", "admin"),
         };
 
+#pragma warning disable RS0030 // Do not use banned APIs, required by contract
         var token = new JwtSecurityToken(
             issuer: "test",
             audience: "test-api",
@@ -89,6 +90,7 @@ public class AuthenticationTest
             expires: DateTime.UtcNow.AddDays(30),
             signingCredentials: creds
         );
+#pragma warning restore RS0030 // Do not use banned APIs
 
         return (key, new JwtSecurityTokenHandler().WriteToken(token));
     }
