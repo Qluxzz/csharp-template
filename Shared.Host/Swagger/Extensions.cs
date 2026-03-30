@@ -61,9 +61,7 @@ public static class Extensions
             var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
             options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
 
-            // When generating TypeScript types from the Swagger spec, this is required to get the correct null value handling
-            // By default all properties are generated as optional
-            options.AddSchemaFilterInstance(new MakeAllPropertiesRequired());
+            options.NonNullableReferenceTypesAsRequired();
             options.SupportNonNullableReferenceTypes();
 
             if (custom is not null)
