@@ -53,10 +53,6 @@ public static class Extensions
 
         services.AddSwaggerGen(options =>
         {
-            // TODO(.NET 10): Swashbuckle will then correctly infer the return types from TypedResults so this can be removed
-            // https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/2595#issuecomment-2967392149
-            options.OperationFilter<Vernou.Swashbuckle.HttpResultsAdapter.HttpResultsOperationFilter>();
-
             // This makes it so doc comments is included in the generated swagger
             var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
             options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
