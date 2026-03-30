@@ -1,0 +1,5 @@
+# Ban all usage of System.DateTime
+T:System.DateTime; Use DateTimeOffset.UtcNow instead for testability and timezone safety.
+
+# Ban DateTimeOffset.Now (local time)
+P:System.DateTimeOffset.Now; Use DateTimeOffset.UtcNow instead to avoid timezone-related bugs.
