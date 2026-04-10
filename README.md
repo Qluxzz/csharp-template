@@ -10,7 +10,11 @@ This is the shared settings for all new projects, this ensures you don't have to
 
 Controllers should always be using [Results type](https://learn.microsoft.com/en-us/aspnet/core/web-api/action-return-types?view=aspnetcore-10.0#resultstresult1-tresultn-type). This ensures that the controller method only return what is defined in the return type.
 
-IActionResult or IAction has no typing information and it's up to you as the developer to annotate your method with `[ProducesResponseType]` attributes and remember to update these whenever the endpoint has changed, otherwise you're lying to the consumer. Using Results removes this possibility entirely.
+`IActionResult` or `IAction` has no typing information and it's up to you as the developer to annotate your method with `[ProducesResponseType]` attributes and remember to update these whenever the endpoint has changed, otherwise you're lying to the consumer. Using Results removes this possibility entirely.
+
+One downside of Results is that they don't compose very well, you can't return a method that returns a subset of the result your method returns so you have to map it so they map 1-1.
+
+Another downside is that Results only prevent underfilling, meaning you return something you don't say you return. But there's nothing preventing you from documenting that you return twenty return types and then only use one in your method.
 
 ## Error handling in controllers
 
@@ -32,7 +36,7 @@ public async Task<Results<Ok, StatusCodeHttpResult>> MyEndpoint()
 }
 ```
 
-On the surface this looks okay, we're hiding the real error so we don't leak any implementation details. The downside of this obfuscation is that it's always active, regardless of what ASPNETCORE_ENVIRONMENT you're running. That means if you're running everything locally, or you're a frontender working against a shared dev environment, you won't have a clue as to what went wrong and have to bug the backend programmer to read the logs.
+On the surface this looks okay, we're hiding the real error so we don't leak any implementation details. The downside of this obfuscation is that it's always active, regardless of what `ASPNETCORE_ENVIRONMENT` you're running. That means if you're running everything locally, or you're a frontender working against a shared dev environment, you won't have a clue as to what went wrong and have to bug the backend programmer to read the logs.
 
 What if we only could have this obfuscation enabled in production, but not in development?
 
@@ -67,7 +71,7 @@ if (app.Environment.IsProduction())
 
 # Formatting
 
-[CSharpier](https://csharpier.com/) is an opinionated code formatter, think Prettier but for C#. The reasoning behind using CSharpier is the same with using Prettier, I don't care about the formatting as long as everyone formats their code the same way and I want it to be automatically formatted. This helps out tremendously in code reviews where you can see clearly what has changed instead of someone adding a line break somewhere.
+[CSharpier](https://csharpier.com/) is an opinionated code formatter, think Prettier for JavaScript/TypeScript but for C#. The reasoning behind using CSharpier is the same with using Prettier, I don't care about the formatting as long as everyone formats their code the same way and I want it to be automatically formatted. This helps out tremendously in code reviews where you can see clearly what has changed instead of someone adding a line break somewhere.
 
 # Analyzers
 
@@ -77,9 +81,9 @@ This analyzer makes sure you're handling Tasks in C# correctly, i.e awaiting the
 
 ## Tetractic.CodeAnalysis.ExceptionAnalyzers
 
-Exceptions should as the name say, only be used for truly unexpected things, since exceptions is not required to be documented the caller of your function can't trust the return type since in addition to what the function says it returns it might also throw a bunch of exceptions.
+Exceptions should as the name say, only be used for exceptional things, since exceptions is not required to be documented the caller of your function can't trust the return type since in addition to what the function says it returns it might also throw a bunch of exceptions.
 
-This analyzer forces you to either catch exceptions within your method, or annotate that your method can throw these exceptions.
+This analyzer forces you to either catch exceptions within your method, or annotate that your method can throw these exceptions, so the caller of your method is then forced to either handle them or also document them on their method.
 
 ## Nullable.Extended.Analyzer
 
