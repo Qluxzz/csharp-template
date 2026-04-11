@@ -26,6 +26,12 @@ public static class Extensions
         // If the API you're calling is using something like snake_case or kebab-case or another not just casing based naming policy,
         options.PropertyNameCaseInsensitive = true;
 
+        // Without this all fields which aren't included in the JSON response will be set to default(T)
+        // Which is usually not what you want, but you want to know that the data was invalid.
+
+        // Also recommended to be set to true for new projects by Microsoft
+        options.RespectRequiredConstructorParameters = true;
+
         options.Converters.Add(_jsonStringEnumConverter);
 
         return options;
@@ -42,9 +48,7 @@ public static class Extensions
         // This makes Swagger report the enums as strings
         services
             .AddControllers()
-            .AddJsonOptions(options =>
-                options.JsonSerializerOptions.Converters.Add(_jsonStringEnumConverter)
-            );
+            .AddJsonOptions(options => DefaultOptions(options.JsonSerializerOptions));
 
         // This is required for the controllers to actually return them as strings
         services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
