@@ -199,6 +199,8 @@ public class SharedHostBuilder
             app.UseDefaultSwagger();
         }
 
+        app.MapControllers();
+
         return new(app);
     }
 }
@@ -217,9 +219,6 @@ public class SharedHost(WebApplication webApplication) : IHost
 
     public Task StopAsync(CancellationToken cancellationToken) =>
         _webApplication.StopAsync(cancellationToken);
-
-    public RouteHandlerBuilder MapGet(string pattern, Delegate handler) =>
-        _webApplication.MapGet(pattern, handler);
 
     public HubEndpointConventionBuilder MapHub<T>(string pattern)
         where T : Hub => _webApplication.MapHub<T>(pattern);
