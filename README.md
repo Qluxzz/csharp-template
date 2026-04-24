@@ -85,13 +85,13 @@ Enum.TryParse<Test>("Foo", out var maybeEnum) // true
 Enum.TryParse<Test>("1337", out var maybeEnum) // true
 ```
 
-Now you might say, wait a minute, I didn't define 1337 in the enum, we only have two defined values 0 and 1. Yeah well enums in C# just has a backing type of by default an int. Which means that any value from -2,147,483,648 to 2,147,483,647 is valid for your enum, weather you define it or not.
+Now you might say, wait a minute, I didn't define 1337 in the enum, we only have two defined values 0 and 1. Yeah well enums in C# just has a backing type of by default an int. Which means that any value from -2,147,483,648 to 2,147,483,647 is valid for your enum, weather you define it or not. You can change the default backing type to a smaller data type by doing `enum Test : ushort`, but it doesn't solve the issue that undefined values are still valid for the enum.
 
 So when parsing from a number you have to do an additional check if the parsed value is actually defined in your enum.
 
 ```csharp
 enum Test {
-  Foo = 0
+  Foo = 0,
   Bar = 1
 }
 
