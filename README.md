@@ -69,6 +69,36 @@ if (app.Environment.IsProduction())
 }
 ```
 
+# Enum parsing
+There are some footguns when parsing Enums that is worth mentioning.
+
+```csharp
+enum Test {
+  Foo = 0, // This is the default values if not defined manually
+  Bar = 1
+}
+
+// From a string
+Enum.TryParse<Test>("Foo", out var maybeEnum) // true
+
+// From a number
+Enum.TryParse<Test>("1337", out var maybeEnum) // true
+```
+
+Now you might say, wait a minute, I didn't define 1337 in the enum, we only have two defined values 0 and 1. Yeah well enums in C# just has a backing type of by default an int. Which means that any value from -2,147,483,648 to 2,147,483,647 is valid for your enum, weather you define it or not.
+
+So when parsing from a number you have to do an additional check if the parsed value is actually defined in your enum.
+
+```csharp
+enum Test {
+  Foo = 0
+  Bar = 1
+}
+
+// From a number
+Enum.TryParse<Test>("1337", out var maybeEnum) && Enum.IsDefined(maybeEnum) // false
+```
+
 # Formatting
 
 [CSharpier](https://csharpier.com/) is an opinionated code formatter, think Prettier for JavaScript/TypeScript but for C#. The reasoning behind using CSharpier is the same with using Prettier, I don't care about the formatting as long as everyone formats their code the same way and I want it to be automatically formatted. This helps out tremendously in code reviews where you can see clearly what has changed instead of someone adding a line break somewhere.
