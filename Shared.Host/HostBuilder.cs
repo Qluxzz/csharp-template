@@ -56,15 +56,13 @@ public class SharedHostBuilder
         return this;
     }
 
-    public SharedHost Build(Action<IServiceCollection>? customServices = null)
+    public SharedHost Build(string[] args, Action<IServiceCollection>? customServices = null)
     {
-        var options = new WebApplicationOptions() { };
+        var options = new WebApplicationOptions() { Args = args };
 
         var builder = WebApplication.CreateSlimBuilder(options);
 
         builder.Services.AddRouting();
-
-        builder.WebHost.UseUrls("http://localhost:8080");
 
         if (_useSwagger)
         {
