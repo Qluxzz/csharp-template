@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -64,8 +66,23 @@ public class SharedHostBuilder
 
         builder.Services.AddRouting();
 
+        builder.Services.AddControllers();
+
+        // This makes enums be returned as their keys rather than their values
+        builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+            DefaultOptions(options.SerializerOptions)
+        );
+
         if (_useSwagger)
         {
+            // JSON OPTIONS
+            // https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/2293
+
+            // This makes Swagger report enums as their keys rather than their values
+            builder
+                .Services.AddControllers()
+                .AddJsonOptions(options => DefaultOptions(options.JsonSerializerOptions));
+
             void Custom(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)
             {
                 if (_useBearerToken)
@@ -201,6 +218,32 @@ public class SharedHostBuilder
 
         return new(app);
     }
+
+    private static readonly JsonNamingPolicy _defaultNamingPolicy = JsonNamingPolicy.CamelCase;
+
+    private static readonly JsonStringEnumConverter _jsonStringEnumConverter = new(
+        namingPolicy: _defaultNamingPolicy,
+        allowIntegerValues: false
+    );
+
+    /// <exception cref="NotSupportedException">Failed to add json converter</exception>
+    private static JsonSerializerOptions DefaultOptions(JsonSerializerOptions options)
+    {
+        // Always serialize as camelCase
+        options.PropertyNamingPolicy = _defaultNamingPolicy;
+        // Ignore casing during deserialization, since we don't always own the API we're calling, we can't enforce their casing.
+        // If the API you're calling is using something like snake_case or kebab-case or another not just casing based naming policy,
+        options.PropertyNameCaseInsensitive = true;
+
+        // Without this all fields which aren't included in the JSON response will be set to default(T)
+        // Which is usually not what you want, you want to know that the data was invalid.
+        // Also recommended to be set to true for new projects by Microsoft
+        options.RespectRequiredConstructorParameters = true;
+
+        options.Converters.Add(_jsonStringEnumConverter);
+
+        return options;
+    }
 }
 
 public class SharedHost(WebApplication webApplication) : IHost
@@ -217,6 +260,9 @@ public class SharedHost(WebApplication webApplication) : IHost
 
     public Task StopAsync(CancellationToken cancellationToken) =>
         _webApplication.StopAsync(cancellationToken);
+
+    public RouteHandlerBuilder MapGet(string pattern, Delegate handler) =>
+        _webApplication.MapGet(pattern, handler);
 
     public HubEndpointConventionBuilder MapHub<T>(string pattern)
         where T : Hub => _webApplication.MapHub<T>(pattern);

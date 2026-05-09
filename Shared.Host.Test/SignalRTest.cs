@@ -11,16 +11,18 @@ namespace Shared.Host.Test;
 
 public class SignalRTest
 {
+    private static readonly string[] _noArgs = [];
+
     [Fact]
     public async Task SignalRHubShouldWorkAsExpected()
     {
-        var host = new SharedHostBuilder().WithSignalR().Build();
+        var host = new SharedHostBuilder().WithSignalR().Build(_noArgs);
 
         host.MapHub<TestHub>(ITestHub.Pattern);
 
         await host.StartAsync(CancellationToken.None);
 
-        var url = $"http://localhost:8080{ITestHub.Pattern}";
+        var url = $"http://localhost:5000{ITestHub.Pattern}";
 
         var connection = new HubConnectionBuilder().WithUrl(url).WithAutomaticReconnect().Build();
 
@@ -34,31 +36,20 @@ public class SignalRTest
     }
 
     [Fact]
-    public async Task SignalRHubWithBearerTokenShouldWorkAsExpected()
+    public async Task SignalRHubWithBearerTokenShouldConnectWhenSupplied()
     {
         var (key, token) = Test();
 
         var host = new SharedHostBuilder()
             .WithSignalR()
             .WithBearerToken(new("test-api", "test", key))
-            .Build();
+            .Build(_noArgs);
 
         host.MapHub<TestHub>(ITestHub.Pattern);
 
         await host.StartAsync(CancellationToken.None);
 
-        var url = $"http://localhost:8080{ITestHub.Pattern}";
-
-        var exception = await Assert.ThrowsAsync<HttpRequestException>(async () =>
-        {
-            var connection = new HubConnectionBuilder()
-                .WithUrl(url)
-                .WithAutomaticReconnect()
-                .Build();
-
-            await connection.StartAsync();
-        });
-        Assert.Equal(HttpStatusCode.Unauthorized, exception.StatusCode);
+        var url = $"http://localhost:5000{ITestHub.Pattern}";
 
         var connection = new HubConnectionBuilder()
             .WithUrl(
@@ -78,6 +69,37 @@ public class SignalRTest
         Assert.Equal(HubConnectionState.Connected, connection.State);
 
         await connection.StopAsync();
+
+        await host.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task SignalRHubWithBearerTokenShouldReturnUnauthorizedWhenNotSupplied()
+    {
+        var (key, token) = Test();
+
+        var host = new SharedHostBuilder()
+            .WithSignalR()
+            .WithBearerToken(new("test-api", "test", key))
+            .Build(_noArgs);
+
+        host.MapHub<TestHub>(ITestHub.Pattern);
+
+        await host.StartAsync(CancellationToken.None);
+
+        var url = $"http://localhost:5000{ITestHub.Pattern}";
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(async () =>
+        {
+            // Did not provide a required bearer token
+            var connection = new HubConnectionBuilder()
+                .WithUrl(url)
+                .WithAutomaticReconnect()
+                .Build();
+
+            await connection.StartAsync();
+        });
+        Assert.Equal(HttpStatusCode.Unauthorized, exception.StatusCode);
 
         await host.StopAsync(CancellationToken.None);
     }

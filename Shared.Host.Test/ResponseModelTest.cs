@@ -10,19 +10,24 @@ namespace Shared.Host.Test;
 
 public class ResponseModelTest
 {
+    private static readonly string[] _noArgs = [];
+
     [Fact]
     public async Task NullableEnumsShouldBeDocumentedInSwaggerAsOptional()
     {
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .Build(services =>
-            {
-                // This is what .UseTestServer does
-                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                services.AddSingleton<IServer, TestServer>();
+            .Build(
+                _noArgs,
+                services =>
+                {
+                    // This is what .UseTestServer does
+                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                    services.AddSingleton<IServer, TestServer>();
 
-                services.AddEndpointsApiExplorer();
-            });
+                    services.AddEndpointsApiExplorer();
+                }
+            );
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithNullableEnum(TestEnum.Baz)));
 
@@ -65,14 +70,17 @@ public class ResponseModelTest
     {
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .Build(services =>
-            {
-                // This is what .UseTestServer does
-                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                services.AddSingleton<IServer, TestServer>();
+            .Build(
+                _noArgs,
+                services =>
+                {
+                    // This is what .UseTestServer does
+                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                    services.AddSingleton<IServer, TestServer>();
 
-                services.AddEndpointsApiExplorer();
-            });
+                    services.AddEndpointsApiExplorer();
+                }
+            );
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithEnum(TestEnum.Bar)));
 
@@ -88,14 +96,17 @@ public class ResponseModelTest
     {
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .Build(services =>
-            {
-                // This is what .UseTestServer does
-                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                services.AddSingleton<IServer, TestServer>();
+            .Build(
+                _noArgs,
+                services =>
+                {
+                    // This is what .UseTestServer does
+                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                    services.AddSingleton<IServer, TestServer>();
 
-                services.AddEndpointsApiExplorer();
-            });
+                    services.AddEndpointsApiExplorer();
+                }
+            );
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithEnum(TestEnum.Baz)));
 

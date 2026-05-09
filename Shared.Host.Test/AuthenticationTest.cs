@@ -1,7 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,17 +11,22 @@ namespace Shared.Host.Test;
 
 public class AuthenticationTest
 {
+    private static readonly string[] _noArgs = [];
+
     [Fact]
     public async Task UnauthorizedAccessIsAllowedIfUseBearerTokenHasntBeenCalled()
     {
-        var host = new SharedHostBuilder().Build(services =>
-        {
-            // This is what .UseTestServer does
-            services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-            services.AddSingleton<IServer, TestServer>();
+        var host = new SharedHostBuilder().Build(
+            _noArgs,
+            services =>
+            {
+                // This is what .UseTestServer does
+                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                services.AddSingleton<IServer, TestServer>();
 
-            services.AddEndpointsApiExplorer();
-        });
+                services.AddEndpointsApiExplorer();
+            }
+        );
 
         var response = "You should see this without passing a bearer token!";
 
@@ -42,14 +46,17 @@ public class AuthenticationTest
 
         var host = new SharedHostBuilder()
             .WithBearerToken(new("test-api", "test", key))
-            .Build(services =>
-            {
-                // This is what .UseTestServer does
-                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                services.AddSingleton<IServer, TestServer>();
+            .Build(
+                _noArgs,
+                services =>
+                {
+                    // This is what .UseTestServer does
+                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                    services.AddSingleton<IServer, TestServer>();
 
-                services.AddEndpointsApiExplorer();
-            });
+                    services.AddEndpointsApiExplorer();
+                }
+            );
 
         var response = "You should not see this without passing a bearer token!";
 
