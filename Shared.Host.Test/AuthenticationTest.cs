@@ -16,6 +16,7 @@ public class AuthenticationTest
     [Fact]
     public async Task UnauthorizedAccessIsAllowedIfUseBearerTokenHasntBeenCalled()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder().Build(
             _noArgs,
             (_, services) =>
@@ -32,16 +33,17 @@ public class AuthenticationTest
 
         host.MapGet("/", () => response);
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartAsync(cancellationToken);
 
-        var test = await host.GetTestClient().GetAsync("/");
+        var test = await host.GetTestClient().GetAsync("/", cancellationToken);
         Assert.Equal(System.Net.HttpStatusCode.OK, test.StatusCode);
-        Assert.Equal(response, await test.Content.ReadAsStringAsync());
+        Assert.Equal(response, await test.Content.ReadAsStringAsync(cancellationToken));
     }
 
     [Fact]
     public async Task UnauthorizedAccessIsNotAllowedIfUseBearerTokenBeenCalled()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var (key, token) = Test();
 
         var host = new SharedHostBuilder()
@@ -62,18 +64,18 @@ public class AuthenticationTest
 
         host.MapGet("/test", () => response);
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartAsync(cancellationToken);
 
         var testClient = host.GetTestClient();
 
-        var test = await testClient.GetAsync("/test");
+        var test = await testClient.GetAsync("/test", cancellationToken);
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, test.StatusCode);
 
         testClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        test = await testClient.GetAsync("/test");
+        test = await testClient.GetAsync("/test", cancellationToken);
         Assert.Equal(System.Net.HttpStatusCode.OK, test.StatusCode);
-        Assert.Equal(response, await test.Content.ReadAsStringAsync());
+        Assert.Equal(response, await test.Content.ReadAsStringAsync(cancellationToken));
     }
 
     private static (SymmetricSecurityKey SigningKey, string Token) Test()

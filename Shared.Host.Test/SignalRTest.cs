@@ -16,28 +16,30 @@ public class SignalRTest
     [Fact]
     public async Task SignalRHubShouldWorkAsExpected()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder().WithSignalR().Build(_noArgs);
 
         host.MapHub<TestHub>(ITestHub.Pattern);
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartAsync(cancellationToken);
 
         var url = $"http://localhost:5000{ITestHub.Pattern}";
 
         var connection = new HubConnectionBuilder().WithUrl(url).WithAutomaticReconnect().Build();
 
-        await connection.StartAsync();
+        await connection.StartAsync(cancellationToken);
 
         Assert.Equal(HubConnectionState.Connected, connection.State);
 
-        await connection.StopAsync();
+        await connection.StopAsync(cancellationToken);
 
-        await host.StopAsync(CancellationToken.None);
+        await host.StopAsync(cancellationToken);
     }
 
     [Fact]
     public async Task SignalRHubWithBearerTokenShouldConnectWhenSupplied()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var (key, token) = Test();
 
         var host = new SharedHostBuilder()
@@ -47,7 +49,7 @@ public class SignalRTest
 
         host.MapHub<TestHub>(ITestHub.Pattern);
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartAsync(cancellationToken);
 
         var url = $"http://localhost:5000{ITestHub.Pattern}";
 
@@ -64,18 +66,19 @@ public class SignalRTest
             .WithAutomaticReconnect()
             .Build();
 
-        await connection.StartAsync();
+        await connection.StartAsync(cancellationToken);
 
         Assert.Equal(HubConnectionState.Connected, connection.State);
 
-        await connection.StopAsync();
+        await connection.StopAsync(cancellationToken);
 
-        await host.StopAsync(CancellationToken.None);
+        await host.StopAsync(cancellationToken);
     }
 
     [Fact]
     public async Task SignalRHubWithBearerTokenShouldReturnUnauthorizedWhenNotSupplied()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var (key, token) = Test();
 
         var host = new SharedHostBuilder()
@@ -85,7 +88,7 @@ public class SignalRTest
 
         host.MapHub<TestHub>(ITestHub.Pattern);
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartAsync(cancellationToken);
 
         var url = $"http://localhost:5000{ITestHub.Pattern}";
 
@@ -97,11 +100,11 @@ public class SignalRTest
                 .WithAutomaticReconnect()
                 .Build();
 
-            await connection.StartAsync();
+            await connection.StartAsync(cancellationToken);
         });
         Assert.Equal(HttpStatusCode.Unauthorized, exception.StatusCode);
 
-        await host.StopAsync(CancellationToken.None);
+        await host.StopAsync(cancellationToken);
     }
 
     private interface ITestHub

@@ -15,6 +15,7 @@ public class ResponseModelTest
     [Fact]
     public async Task NullableEnumsShouldBeDocumentedInSwaggerAsOptional()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder()
             .WithSwagger()
             .Build(
@@ -31,11 +32,10 @@ public class ResponseModelTest
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithNullableEnum(TestEnum.Baz)));
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartAsync(cancellationToken);
 
-        var response = await host.GetTestClient().GetByteArrayAsync("/swagger/v1/swagger.json");
-
-        await File.WriteAllBytesAsync("output", response);
+        var response = await host.GetTestClient()
+            .GetByteArrayAsync("/swagger/v1/swagger.json", cancellationToken);
 
         using var stream = new MemoryStream(response);
 
@@ -68,6 +68,7 @@ public class ResponseModelTest
     [Fact]
     public async Task EnumsShouldBeReturnedAsStrings()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder()
             .WithSwagger()
             .Build(
@@ -84,9 +85,9 @@ public class ResponseModelTest
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithEnum(TestEnum.Bar)));
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartAsync(cancellationToken);
 
-        var response = await host.GetTestClient().GetStringAsync("/test");
+        var response = await host.GetTestClient().GetStringAsync("/test", cancellationToken);
 
         Assert.Contains(@"{""testEnum"":""bar""}", response);
     }
@@ -94,6 +95,7 @@ public class ResponseModelTest
     [Fact]
     public async Task EnumsShouldBeDocumentedInSwaggerAsStrings()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder()
             .WithSwagger()
             .Build(
@@ -110,9 +112,10 @@ public class ResponseModelTest
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithEnum(TestEnum.Baz)));
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartAsync(cancellationToken);
 
-        var response = await host.GetTestClient().GetByteArrayAsync("/swagger/v1/swagger.json");
+        var response = await host.GetTestClient()
+            .GetByteArrayAsync("/swagger/v1/swagger.json", cancellationToken);
 
         using var stream = new MemoryStream(response);
 
