@@ -19,7 +19,7 @@ public class ResponseModelTest
             .WithSwagger()
             .Build(
                 _noArgs,
-                services =>
+                (_, services) =>
                 {
                     // This is what .UseTestServer does
                     services.AddSingleton<IHostLifetime, NoopHostLifetime>();
@@ -72,7 +72,7 @@ public class ResponseModelTest
             .WithSwagger()
             .Build(
                 _noArgs,
-                services =>
+                (_, services) =>
                 {
                     // This is what .UseTestServer does
                     services.AddSingleton<IHostLifetime, NoopHostLifetime>();
@@ -98,7 +98,7 @@ public class ResponseModelTest
             .WithSwagger()
             .Build(
                 _noArgs,
-                services =>
+                (_, services) =>
                 {
                     // This is what .UseTestServer does
                     services.AddSingleton<IHostLifetime, NoopHostLifetime>();

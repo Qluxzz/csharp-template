@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
@@ -58,7 +59,10 @@ public class SharedHostBuilder
         return this;
     }
 
-    public SharedHost Build(string[] args, Action<IServiceCollection>? customServices = null)
+    public SharedHost Build(
+        string[] args,
+        Action<IConfiguration, IServiceCollection>? customServices = null
+    )
     {
         var options = new WebApplicationOptions() { Args = args };
 
@@ -177,7 +181,7 @@ public class SharedHostBuilder
         }
 
         // Registering services is not dependant on the order
-        customServices?.Invoke(builder.Services);
+        customServices?.Invoke(builder.Configuration, builder.Services);
 
         var app = builder.Build();
 

@@ -18,7 +18,7 @@ public class AuthenticationTest
     {
         var host = new SharedHostBuilder().Build(
             _noArgs,
-            services =>
+            (_, services) =>
             {
                 // This is what .UseTestServer does
                 services.AddSingleton<IHostLifetime, NoopHostLifetime>();
@@ -48,7 +48,7 @@ public class AuthenticationTest
             .WithBearerToken(new("test-api", "test", key))
             .Build(
                 _noArgs,
-                services =>
+                (_, services) =>
                 {
                     // This is what .UseTestServer does
                     services.AddSingleton<IHostLifetime, NoopHostLifetime>();
