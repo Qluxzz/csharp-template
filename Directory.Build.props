@@ -13,6 +13,10 @@
       VSTHRD200: Don't require async methods to end with Async suffix
     -->
     <NoWarn>1591,VSTHRD200</NoWarn>
+    <!--
+      Forward the CancellationToken to methods accepting one
+    -->
+    <WarningsAsErrors>CA2016</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15">
