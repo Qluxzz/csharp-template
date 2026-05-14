@@ -15,7 +15,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Check formatting
-        run: dotnet csharpier --check .
+        run: dotnet tool run csharpier check .
 
       - name: Run tests
         run: dotnet test
