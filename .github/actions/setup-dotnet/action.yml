@@ -1,5 +1,5 @@
 name: "Setup .NET"
-description: "Sets up the .NET SDK using the version defined in global.json"
+description: "Sets up the .NET SDK using the version defined in global.json and caching of nuget packages"
 
 runs:
   using: "composite"
