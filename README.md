@@ -6,7 +6,42 @@ This template contains everything I normally use when building a C# application 
 
 This is the shared settings for all new projects, this ensures you don't have to setup anything when creating a new project in the solution, every warning and error and styling and linting should be inherited from this file to your project.
 
-# Controllers
+# Directory.Packages.props
+
+This project uses centralized package management so all packages used and their versions are defined in this one file. Since we treat warnings as errors if multiple packages had different versions and you have a project dependency you will get an error when it's trying to resolve the package version since they differ. This solves it and simplifies the package version handling by just using a single version for that package in all of your projects.
+
+# Formatting
+
+[CSharpier](https://csharpier.com/) is an opinionated code formatter, think Prettier for JavaScript/TypeScript but for C#. The reasoning behind using CSharpier is the same with using Prettier, I don't care about the formatting as long as everyone formats their code the same way and I want it to be automatically formatted. This helps out tremendously in code reviews where you can see clearly what has changed instead of someone adding a line break somewhere.
+
+# Pipeline
+
+The included pipeline verifies all files are formatted using csharpier, and runs all tests.
+
+# Analyzers
+
+## Microsoft.VisualStudio.Threading.Analyzers:
+
+This analyzer makes sure you're handling Tasks in C# correctly, i.e awaiting them correctly, since synchronously waiting on Task, ValueTask, or awaiters is dangerous and may cause dead locks.
+
+## Tetractic.CodeAnalysis.ExceptionAnalyzers
+
+Exceptions should as the name say, only be used for exceptional things, since exceptions is not required to be documented the caller of your function can't trust the return type since in addition to what the function says it returns it might also throw a bunch of exceptions.
+
+This analyzer forces you to either catch exceptions within your method, or annotate that your method can throw these exceptions, so the caller of your method is then forced to either handle them or also document them on their method.
+
+## Nullable.Extended.Analyzer
+
+This analyzer forbids the null forgiving operator, using it indicates a modelling issue, if you want to say that you know this not to be null at this point, why don't you model your types correctly so they cannot be null at this point? Usually however using the following `?? throw new Exception("include as much info you need to debug the issue if it unexpectedly was null here")` is a much better solution to using the null forgiving operator which will just result in a NullReferenceException without any info to how the object looked at the time of the exception
+
+
+# General
+
+## Background Services
+
+Background services doesn't make use of the unhandled exception middleware, so if an exception is thrown in one, it will by default kill the host. This can be changed to only kill the background service itself but that's something you probably don't want either. So always remember to wrap your calling code in a try catch so it won't be killed by an unexpected exception.
+
+## Controllers
 
 Controllers should always be using [Results type](https://learn.microsoft.com/en-us/aspnet/core/web-api/action-return-types?view=aspnetcore-10.0#resultstresult1-tresultn-type). This ensures that the controller method only return what is defined in the return type.
 
@@ -16,7 +51,7 @@ One downside of Results is that they don't compose very well, you can't return a
 
 Another downside is that Results only prevent underfilling, meaning you return something you don't say you return. But there's nothing preventing you from documenting that you return twenty return types and then only use one in your method.
 
-## Error handling in controllers
+### Error handling in controllers
 
 A common pattern I've seen is:
 
@@ -69,7 +104,7 @@ if (app.Environment.IsProduction())
 }
 ```
 
-# Enum parsing
+## Enum parsing
 There are some footguns when parsing Enums that is worth mentioning.
 
 ```csharp
@@ -98,32 +133,6 @@ enum Test {
 // From a number
 Enum.TryParse<Test>("1337", out var maybeEnum) && Enum.IsDefined(maybeEnum) // false
 ```
-
-# Formatting
-
-[CSharpier](https://csharpier.com/) is an opinionated code formatter, think Prettier for JavaScript/TypeScript but for C#. The reasoning behind using CSharpier is the same with using Prettier, I don't care about the formatting as long as everyone formats their code the same way and I want it to be automatically formatted. This helps out tremendously in code reviews where you can see clearly what has changed instead of someone adding a line break somewhere.
-
-# Analyzers
-
-## Microsoft.VisualStudio.Threading.Analyzers:
-
-This analyzer makes sure you're handling Tasks in C# correctly, i.e awaiting them correctly, since synchronously waiting on Task, ValueTask, or awaiters is dangerous and may cause dead locks.
-
-## Tetractic.CodeAnalysis.ExceptionAnalyzers
-
-Exceptions should as the name say, only be used for exceptional things, since exceptions is not required to be documented the caller of your function can't trust the return type since in addition to what the function says it returns it might also throw a bunch of exceptions.
-
-This analyzer forces you to either catch exceptions within your method, or annotate that your method can throw these exceptions, so the caller of your method is then forced to either handle them or also document them on their method.
-
-## Nullable.Extended.Analyzer
-
-This analyzer forbids the null forgiving operator, using it indicates a modelling issue, if you want to say that you know this not to be null at this point, why don't you model your types correctly so they cannot be null at this point? Usually however using the following `?? throw new Exception("include as much info you need to debug the issue if it unexpectedly was null here")` is a much better solution to using the null forgiving operator which will just result in a NullReferenceException without any info to how the object looked at the time of the exception
-
-# Background Services
-
-Background services doesn't make use of the unhandled exception middleware, so if an exception is thrown in one, it will by default kill the host. This can be changed to only kill the background service itself but that's something you probably don't want either. So always remember to wrap your calling code in a try catch so it won't be killed by an unexpected exception.
-
-# General
 
 ## Public Setters considered harmful
 
