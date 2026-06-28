@@ -5,19 +5,19 @@
   <ItemGroup>
     <!-- Analyzers -->
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" />
-    <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" />
+    <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="18.7.23" />
     <PackageVersion Include="Nullable.Extended.Analyzer" Version="1.15.6581" />
     <PackageVersion Include="Tetractic.CodeAnalysis.ExceptionAnalyzers" Version="1.4.9" />
     <!-- Shared.Host -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageVersion Include="SignalRSwaggerGen" Version="4.9.0" />
-    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.2" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <!-- Shared.Host.Test -->
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.9" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
