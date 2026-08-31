@@ -1,6 +1,19 @@
 <Project>
   <PropertyGroup>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!--
+      Some SDK-distributed .NET installations, such as distro packaged SDKs, expose
+      SDK-injected packages from a local library-packs folder. Those packages can have
+      different content hashes than the same package ID/version from NuGet.org, which 
+      makes packages.lock.json differ between developer machines and CI. Disable the
+      implicit folder so lock files are generated from the configured NuGet sources.
+    -->
+    <DisableImplicitLibraryPacksFolder>true</DisableImplicitLibraryPacksFolder>
+    <!--
+      Requires you to explicitly update the lock files, instead of them being automatically
+      regenerated every time you do `dotnet build`, since that does an implicit `dotnet restore`
+    -->
+    <RestoreLockedMode>true</RestoreLockedMode>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>default</LangVersion>
     <Nullable>enable</Nullable>
