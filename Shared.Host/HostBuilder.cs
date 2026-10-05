@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Shared.Host.Swagger;
@@ -67,6 +68,13 @@ public class SharedHostBuilder
         var options = new WebApplicationOptions() { Args = args };
 
         var builder = WebApplication.CreateSlimBuilder(options);
+
+        builder.Logging.AddSimpleConsole(options =>
+        {
+            options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz ";
+            options.UseUtcTimestamp = false;
+            options.SingleLine = true;
+        });
 
         builder.Services.AddRouting();
 
