@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Shared.Host.TypedIds;
 
 namespace Shared.Host.Swagger;
 
@@ -21,6 +22,10 @@ public static class Extensions
 
             options.NonNullableReferenceTypesAsRequired();
             options.SupportNonNullableReferenceTypes();
+
+            // Strongly-typed IDs serialize as their unwrapped, prefixed string (e.g. "example_<guid>").
+            // This filter makes the OpenAPI schema report them as that string instead of an object.
+            options.SchemaFilter<StronglyTypedIdSchemaFilter>();
 
             if (custom is not null)
                 custom(options);

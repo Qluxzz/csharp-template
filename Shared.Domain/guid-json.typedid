@@ -1,0 +1,295 @@
+    [global::System.ComponentModel.TypeConverter(typeof(PLACEHOLDERIDTypeConverter))]
+    [global::System.Text.Json.Serialization.JsonConverter(typeof(PLACEHOLDERIDSystemTextJsonConverter))]
+    partial struct PLACEHOLDERID :
+        global::System.IUtf8SpanFormattable,
+        global::System.IComparable<PLACEHOLDERID>, global::System.IEquatable<PLACEHOLDERID>, global::System.IFormattable
+    {
+        private global::System.Guid Value { get; }
+
+        private PLACEHOLDERID(global::System.Guid value)
+        {
+            Value = value;
+        }
+
+        // Prefix derived from the type name, e.g. "ChecklistInstanceId" → "checklist-instance_"
+        private static readonly string Prefix = InitPrefix_();
+        private static string InitPrefix_()
+        {
+            var name = nameof(PLACEHOLDERID);
+            if (name.EndsWith("Id", global::System.StringComparison.Ordinal))
+                name = name[..^2];
+            var result = new global::System.Text.StringBuilder(name.Length + 8);
+            for (int i = 0; i < name.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(name[i]) && char.IsLower(name[i - 1]))
+                    result.Append('-');
+                result.Append(char.ToLowerInvariant(name[i]));
+            }
+            result.Append('_');
+            return result.ToString();
+        }
+
+        private static string StripPrefix_(string input) =>
+            input.StartsWith(Prefix, global::System.StringComparison.Ordinal)
+                ? input[Prefix.Length..]
+                : throw new global::System.ArgumentException($"Input does not start with expected prefix '{Prefix}'", nameof(input));
+
+        public static PLACEHOLDERID New() => new PLACEHOLDERID(global::System.Guid.NewGuid());
+
+        /// <inheritdoc cref="global::System.IEquatable{T}"/>
+        public bool Equals(PLACEHOLDERID other) => this.Value.Equals(other.Value);
+        public override bool Equals(object? obj)
+        {
+            if (ReferenceEquals(null, obj)) return false;
+            return obj is PLACEHOLDERID other && Equals(other);
+        }
+
+        public override int GetHashCode() => Value.GetHashCode();
+
+        public override string ToString() => $"{Prefix}{Value}";
+        public static implicit operator string(PLACEHOLDERID x) => $"{PLACEHOLDERID.Prefix}{x.Value}";
+        public static implicit operator global::System.Guid(PLACEHOLDERID x) => x.Value;
+
+        public static bool operator ==(PLACEHOLDERID a, PLACEHOLDERID b) => a.Equals(b);
+        public static bool operator !=(PLACEHOLDERID a, PLACEHOLDERID b) => !(a == b);
+        public static bool operator >  (PLACEHOLDERID a, PLACEHOLDERID b) => a.CompareTo(b) > 0;
+        public static bool operator <  (PLACEHOLDERID a, PLACEHOLDERID b) => a.CompareTo(b) < 0;
+        public static bool operator >=  (PLACEHOLDERID a, PLACEHOLDERID b) => a.CompareTo(b) >= 0;
+        public static bool operator <=  (PLACEHOLDERID a, PLACEHOLDERID b) => a.CompareTo(b) <= 0;
+
+        /// <inheritdoc cref="global::System.IComparable{TSelf}"/>
+        public int CompareTo(PLACEHOLDERID other) => Value.CompareTo(other.Value);
+
+        public partial class PLACEHOLDERIDTypeConverter : global::System.ComponentModel.TypeConverter
+        {
+            public override bool CanConvertFrom(global::System.ComponentModel.ITypeDescriptorContext? context, global::System.Type sourceType)
+            {
+                return sourceType == typeof(global::System.Guid) || sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
+            }
+        
+            public override object? ConvertFrom(global::System.ComponentModel.ITypeDescriptorContext? context, global::System.Globalization.CultureInfo? culture, object value)
+            {
+                return value switch
+                {
+                    global::System.Guid guidValue when guidValue != global::System.Guid.Empty => new PLACEHOLDERID(guidValue),
+                    global::System.Guid => throw new global::System.ArgumentException("GUID cannot be empty"),
+                    string stringValue when !string.IsNullOrEmpty(stringValue) && global::System.Guid.TryParse(PLACEHOLDERID.StripPrefix_(stringValue), out var result) && result != global::System.Guid.Empty => new PLACEHOLDERID(result),
+                    string stringValue when !string.IsNullOrEmpty(stringValue) && global::System.Guid.TryParse(PLACEHOLDERID.StripPrefix_(stringValue), out var result) && result == global::System.Guid.Empty => throw new global::System.ArgumentException("GUID cannot be empty"),
+                    _ => base.ConvertFrom(context, culture, value),
+                };
+            }
+
+            public override bool CanConvertTo(global::System.ComponentModel.ITypeDescriptorContext? context, global::System.Type? sourceType)
+            {
+                return sourceType == typeof(global::System.Guid) || sourceType == typeof(string) || base.CanConvertTo(context, sourceType);
+            }
+
+            public override object? ConvertTo(global::System.ComponentModel.ITypeDescriptorContext? context, global::System.Globalization.CultureInfo? culture, object? value, global::System.Type destinationType)
+            {
+                if (value is PLACEHOLDERID idValue)
+                {
+                    if (destinationType == typeof(global::System.Guid))
+                    {
+                        return idValue.Value;
+                    }
+
+                    if (destinationType == typeof(string))
+                    {
+                        return $"{PLACEHOLDERID.Prefix}{idValue.Value}";
+                    }
+                }
+
+                return base.ConvertTo(context, culture, value, destinationType);
+            }
+        }
+
+        public partial class PLACEHOLDERIDSystemTextJsonConverter : global::System.Text.Json.Serialization.JsonConverter<PLACEHOLDERID>
+        {
+            public override PLACEHOLDERID Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
+            {
+                var str = reader.GetString() ?? throw new global::System.Text.Json.JsonException($"Value for {nameof(PLACEHOLDERID)} was null");
+                if (!str.StartsWith(PLACEHOLDERID.Prefix, global::System.StringComparison.Ordinal)
+                    || !global::System.Guid.TryParse(str[PLACEHOLDERID.Prefix.Length..], out var guid))
+                    throw new global::System.Text.Json.JsonException($"Invalid {nameof(PLACEHOLDERID)} value: {str}");
+                if (guid == global::System.Guid.Empty)
+                    throw new global::System.Text.Json.JsonException("GUID cannot be empty");
+                return new(guid);
+            }
+
+            public override void Write(global::System.Text.Json.Utf8JsonWriter writer, PLACEHOLDERID value, global::System.Text.Json.JsonSerializerOptions options)
+                => writer.WriteStringValue($"{PLACEHOLDERID.Prefix}{value.Value}");
+
+            public override PLACEHOLDERID ReadAsPropertyName(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
+            {
+                var guidString = reader.GetString() ?? throw new global::System.Text.Json.JsonException($"The string for the {nameof(PLACEHOLDERID)} property was null");
+                if (!guidString.StartsWith(PLACEHOLDERID.Prefix, global::System.StringComparison.Ordinal)
+                    || !global::System.Guid.TryParse(guidString[PLACEHOLDERID.Prefix.Length..], out var guid))
+                    throw new global::System.Text.Json.JsonException($"Invalid {nameof(PLACEHOLDERID)} property name: {guidString}");
+                if (guid == global::System.Guid.Empty)
+                    throw new global::System.Text.Json.JsonException("GUID cannot be empty");
+                return new(guid);
+            }
+
+            public override void WriteAsPropertyName(global::System.Text.Json.Utf8JsonWriter writer, PLACEHOLDERID value, global::System.Text.Json.JsonSerializerOptions options)
+                => writer.WritePropertyName($"{PLACEHOLDERID.Prefix}{value.Value}");
+        }
+
+        public static PLACEHOLDERID Parse(string input)
+        {
+            var guid = global::System.Guid.Parse(StripPrefix_(input));
+            if (guid == global::System.Guid.Empty)
+                throw new global::System.ArgumentException("GUID cannot be empty", nameof(input));
+            return new(guid);
+        }
+
+        /// <inheritdoc cref="global::System.IParsable{TSelf}"/>
+        public static PLACEHOLDERID Parse(string input, global::System.IFormatProvider? provider)
+        {
+            var guid = global::System.Guid.Parse(StripPrefix_(input), provider);
+            if (guid == global::System.Guid.Empty)
+                throw new global::System.ArgumentException("GUID cannot be empty", nameof(input));
+            return new(guid);
+        }
+
+        /// <inheritdoc cref="global::System.IParsable{TSelf}"/>
+        public static bool TryParse(
+            [global::System.Diagnostics.CodeAnalysis.NotNullWhen(true)] string? input,
+            global::System.IFormatProvider? provider,
+            out PLACEHOLDERID result)
+        {
+            if (input is null || !input.StartsWith(Prefix, global::System.StringComparison.Ordinal))
+            {
+                result = default;
+                return false;
+            }
+
+            if (global::System.Guid.TryParse(input[Prefix.Length..], provider, out var guid) && guid != global::System.Guid.Empty)
+            {
+                result = new(guid);
+                return true;
+            }
+            else
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        /// <inheritdoc cref="global::System.IFormattable"/>
+        public string ToString(
+            [global::System.Diagnostics.CodeAnalysis.StringSyntax(global::System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.GuidFormat)]
+            string? format,
+            global::System.IFormatProvider? formatProvider)
+            => $"{Prefix}{Value.ToString(format, formatProvider)}";
+
+        public static PLACEHOLDERID Parse(global::System.ReadOnlySpan<char> input)
+        {
+            if (!input.StartsWith(Prefix.AsSpan()))
+                throw new global::System.ArgumentException($"Input does not start with expected prefix '{Prefix}'");
+            input = input[Prefix.Length..];
+            var guid = global::System.Guid.Parse(input);
+            if (guid == global::System.Guid.Empty)
+                throw new global::System.ArgumentException("GUID cannot be empty");
+            return new(guid);
+        }
+
+        /// <inheritdoc cref="global::System.ISpanParsable{TSelf}"/>
+        public static PLACEHOLDERID Parse(global::System.ReadOnlySpan<char> input, global::System.IFormatProvider? provider)
+        {
+            if (!input.StartsWith(Prefix.AsSpan()))
+                throw new global::System.ArgumentException($"Input does not start with expected prefix '{Prefix}'");
+            input = input[Prefix.Length..];
+            var guid = global::System.Guid.Parse(input, provider);
+            if (guid == global::System.Guid.Empty)
+                throw new global::System.ArgumentException("GUID cannot be empty");
+            return new(guid);
+        }
+
+        /// <inheritdoc cref="global::System.ISpanParsable{TSelf}"/>
+        public static bool TryParse(global::System.ReadOnlySpan<char> input, global::System.IFormatProvider? provider, out PLACEHOLDERID result)
+        {
+            if (!input.StartsWith(Prefix.AsSpan()))
+            {
+                result = default;
+                return false;
+            }
+            input = input[Prefix.Length..];
+            if (global::System.Guid.TryParse(input, provider, out var guid) && guid != global::System.Guid.Empty)
+            {
+                result = new(guid);
+                return true;
+            }
+            else
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        /// <inheritdoc cref="global::System.ISpanFormattable"/>
+        public bool TryFormat(
+            global::System.Span<char> destination,
+            out int charsWritten,
+            [global::System.Diagnostics.CodeAnalysis.StringSyntax(global::System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.GuidFormat)]
+            global::System.ReadOnlySpan<char> format,
+            global::System.IFormatProvider? provider)
+        {
+            if (!Prefix.AsSpan().TryCopyTo(destination))
+            {
+                charsWritten = 0;
+                return false;
+            }
+            if (!Value.TryFormat(destination[Prefix.Length..], out var guidCharsWritten, format))
+            {
+                charsWritten = 0;
+                return false;
+            }
+            charsWritten = Prefix.Length + guidCharsWritten;
+            return true;
+        }
+
+        /// <inheritdoc cref="global::System.ISpanFormattable"/>
+        public bool TryFormat(
+            global::System.Span<char> destination,
+            out int charsWritten,
+            [global::System.Diagnostics.CodeAnalysis.StringSyntax(global::System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.GuidFormat)]
+            global::System.ReadOnlySpan<char> format = default)
+        {
+            if (!Prefix.AsSpan().TryCopyTo(destination))
+            {
+                charsWritten = 0;
+                return false;
+            }
+            if (!Value.TryFormat(destination[Prefix.Length..], out var guidCharsWritten, format))
+            {
+                charsWritten = 0;
+                return false;
+            }
+            charsWritten = Prefix.Length + guidCharsWritten;
+            return true;
+        }
+            /// <inheritdoc cref="global::System.IUtf8SpanFormattable.TryFormat" />
+            public bool TryFormat(
+                global::System.Span<byte> utf8Destination,
+                out int bytesWritten,
+                [global::System.Diagnostics.CodeAnalysis.StringSyntax(global::System.Diagnostics.CodeAnalysis.StringSyntaxAttribute.GuidFormat)]
+                global::System.ReadOnlySpan<char> format,
+                global::System.IFormatProvider? provider)
+            {
+                // Prefix is always ASCII so byte count equals char count
+                if (utf8Destination.Length < Prefix.Length)
+                {
+                    bytesWritten = 0;
+                    return false;
+                }
+                for (int i = 0; i < Prefix.Length; i++)
+                    utf8Destination[i] = (byte)Prefix[i];
+                if (!Value.TryFormat(utf8Destination[Prefix.Length..], out var guidBytesWritten, format))
+                {
+                    bytesWritten = 0;
+                    return false;
+                }
+                bytesWritten = Prefix.Length + guidBytesWritten;
+                return true;
+            }
+    }

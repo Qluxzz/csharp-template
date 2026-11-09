@@ -34,7 +34,6 @@ This analyzer forces you to either catch exceptions within your method, or annot
 
 This analyzer forbids the null forgiving operator, using it indicates a modelling issue, if you want to say that you know this not to be null at this point, why don't you model your types correctly so they cannot be null at this point? Usually however using the following `?? throw new Exception("include as much info you need to debug the issue if it unexpectedly was null here")` is a much better solution to using the null forgiving operator which will just result in a NullReferenceException without any info to how the object looked at the time of the exception
 
-
 # General
 
 ## Background Services
@@ -105,6 +104,7 @@ if (app.Environment.IsProduction())
 ```
 
 ## Enum parsing
+
 There are some footguns when parsing Enums that is worth mentioning.
 
 ```csharp
@@ -174,6 +174,33 @@ public record Foo(int Bar, int Baz);
 ## Parse don't validate, primitive obsession
 
 https://gist.github.com/Qluxzz/706043bc37d0d1030e1cd9d3841918f5
+
+## Type-safe IDs
+
+If every id in your system is a `Guid`, the compiler can't stop you from passing a user's id where an order's id was expected, and nothing stops you from swapping the arguments in `Transfer(Guid from, Guid to)`. The id is "just a `Guid`", so all the meaning lives in your head and in variable names.
+
+The fix is to give every id its own type. Instead of `Guid`, a `UserId` is a `UserId` and an `OrderId` is an `OrderId`, and the two are not interchangeable:
+
+```csharp
+using StronglyTypedIds;
+
+[StronglyTypedId]
+public partial struct UserId { }
+
+[StronglyTypedId]
+public partial struct OrderId { }
+```
+
+```csharp
+void Ship(OrderId order) { ... }
+
+Ship(userId); // compile error, a UserId is not an OrderId
+Ship(orderId); // fine
+
+// PlaceOrder(UserId user, OrderId order) can no longer have its arguments swapped by accident
+```
+
+With the StronglyTypedIdSchemaFilter this also includes metadata in the OpenAPI specification which can be used together with openapi-typescript to generate types which are typed as `order_${string}` which ensures type safety in the frontend as well when passing identifiers around.
 
 ## .Single and .First considered harmful
 
@@ -250,3 +277,140 @@ For PostgreSQL specifically, this forces double-quotes to be added since unquote
 For this case you can use https://github.com/efcore/EFCore.NamingConventions and make it so all tables, column, indexes are created using snake_case instead.
 
 Just be mindful of ASP.NET Identity and other libraries that override this behavior in the onModelCreating method of the context. https://github.com/efcore/EFCore.NamingConventions/issues/2
+
+## Storing type-safe IDs
+
+[Type-safe IDs](#type-safe-ids) travel over the wire as prefixed strings, but in the database you want the `Guid` they wrap stored in a real `uuid` column — not an `example_...` string. EF Core doesn't know how to map a `UserId` struct on its own, and registering a `ValueConverter` for every id by hand gets old fast.
+
+Because every id lives in the single `Shared.Domain` namespace, and the template gives each one a private `Value` property and a private `Guid` constructor, you can register one `ValueConverterSelector` that converts _every_ id in that namespace to its backing `Guid`. Add a new id and it's covered automatically, no per-id registration:
+
+```csharp
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Shared.Domain;
+
+namespace Shared.Database;
+
+public class StronglyTypedIdValueConverterSelector(ValueConverterSelectorDependencies dependencies)
+    : ValueConverterSelector(dependencies)
+{
+    // The dictionary in the base type is private, so we need our own one here.
+    private readonly ConcurrentDictionary<
+        (Type ModelClrType, Type ProviderClrType),
+        ValueConverterInfo
+    > _converters = new();
+
+    private readonly string _idModelNameSpace =
+        typeof(ExampleId).Namespace
+        ?? throw new Exception("Expected ExampleId type to have a namespace");
+
+    public override IEnumerable<ValueConverterInfo> Select(
+        Type modelClrType,
+        Type? providerClrType = null
+    )
+    {
+        var baseConverters = base.Select(modelClrType, providerClrType);
+        foreach (var converter in baseConverters)
+        {
+            yield return converter;
+        }
+
+        // Extract the "real" type T from Nullable<T> if required
+        var underlyingModelType = UnwrapNullableType(modelClrType);
+        var underlyingProviderType = UnwrapNullableType(providerClrType);
+
+        // 'null' means 'get any value converters for the modelClrType'
+        if (underlyingProviderType is null || underlyingProviderType == typeof(Guid))
+        {
+            var modelNameSpace =
+                underlyingModelType?.Namespace
+                ?? throw new Exception("Underlying model type was null!");
+            if (modelNameSpace == _idModelNameSpace)
+            {
+                yield return _converters.GetOrAdd(
+                    (underlyingModelType, typeof(Guid)),
+                    _ =>
+                    {
+                        // Create conversion expressions
+                        var valueProperty = underlyingModelType.GetProperty(
+                            "Value",
+                            System.Reflection.BindingFlags.NonPublic
+                                | System.Reflection.BindingFlags.Instance
+                        );
+                        if (valueProperty is null)
+                            throw new InvalidOperationException(
+                                $"Type {underlyingModelType.Name} must have a 'Value' property"
+                            );
+
+                        // Create: id => id.Value
+                        var modelParam = Expression.Parameter(underlyingModelType, "id");
+                        var convertToProvider = Expression.Lambda(
+                            Expression.Property(modelParam, valueProperty),
+                            modelParam
+                        );
+
+                        // Create: guid => new TId(guid)
+                        var guidParam = Expression.Parameter(typeof(Guid), "guid");
+                        var constructor = underlyingModelType.GetConstructor(
+                            System.Reflection.BindingFlags.NonPublic
+                                | System.Reflection.BindingFlags.Instance,
+                            [typeof(Guid)]
+                        );
+                        if (constructor is null)
+                            throw new InvalidOperationException(
+                                $"Type {underlyingModelType.Name} must have a constructor accepting Guid"
+                            );
+
+                        var convertFromProvider = Expression.Lambda(
+                            Expression.New(constructor, guidParam),
+                            guidParam
+                        );
+
+                        // Create the converter type
+                        var converterType = typeof(ValueConverter<,>).MakeGenericType(
+                            underlyingModelType,
+                            typeof(Guid)
+                        );
+
+                        ValueConverter factory(ValueConverterInfo info) =>
+                            (ValueConverter)(
+                                Activator.CreateInstance(
+                                    converterType,
+                                    convertToProvider,
+                                    convertFromProvider,
+                                    info.MappingHints
+                                )
+                                ?? throw new Exception(
+                                    $"Failed to create instance for type {converterType}"
+                                )
+                            );
+
+                        return new ValueConverterInfo(underlyingModelType, typeof(Guid), factory);
+                    }
+                );
+            }
+        }
+    }
+
+    private static Type? UnwrapNullableType(Type? type)
+    {
+        if (type is null)
+        {
+            return null;
+        }
+
+        return Nullable.GetUnderlyingType(type) ?? type;
+    }
+}
+```
+
+Then register it once when configuring the `DbContext`, so it applies to the whole model:
+
+```csharp
+options
+    .ReplaceService<IValueConverterSelector, StronglyTypedIdValueConverterSelector>()
+    .UseNpgsql(/* ... */);
+```
+
+It reaches each id's backing `Guid` by reflecting over the private `Value` property and constructor the template generates, which is what lets one selector cover every id instead of a hand-written `ValueConverter` per type.

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Keeps the [StronglyTypedId] attribute in the compiled IL so the OpenAPI schema filter
+         in Shared.Host can find it via reflection at runtime. Without it the attribute is
+         stripped and IDs render as objects in Swagger instead of prefixed strings. -->
+    <DefineConstants>$(DefineConstants);STRONGLY_TYPED_ID_USAGES</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StronglyTypedId" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The template the source generator expands every [StronglyTypedId] struct with. -->
+    <AdditionalFiles Include="guid-json.typedid" />
+  </ItemGroup>
+</Project>

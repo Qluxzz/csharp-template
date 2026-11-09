@@ -413,12 +413,19 @@
           "xunit.v3.runner.common": "[3.2.2]"
         }
       },
+      "shared.domain": {
+        "type": "Project",
+        "dependencies": {
+          "StronglyTypedId": "[1.0.0-beta08, )"
+        }
+      },
       "shared.host": {
         "type": "Project",
         "dependencies": {
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.10, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.10, )",
           "SignalRSwaggerGen": "[4.9.0, )",
+          "StronglyTypedId": "[1.0.0-beta08, )",
           "Swashbuckle.AspNetCore": "[10.2.3, )"
         }
       },
@@ -449,6 +456,12 @@
           "SignalRSwaggerGen.Utils": "1.8.0",
           "Swashbuckle.AspNetCore.SwaggerGen": "10.0.0"
         }
+      },
+      "StronglyTypedId": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.0-beta08, )",
+        "resolved": "1.0.0-beta08",
+        "contentHash": "OH6JM8O+zhukeyOhtkh6Ya1Fj/bSvvR4wTCPeP3/R93hlV+oaTAmPn05yvuPCF3RwCRuA6FYAsleNEpQmwB1pw=="
       },
       "Swashbuckle.AspNetCore": {
         "type": "CentralTransitive",
