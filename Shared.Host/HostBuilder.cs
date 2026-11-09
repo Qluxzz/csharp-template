@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Shared.Host.Json;
 using Shared.Host.Swagger;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -78,23 +80,28 @@ public class SharedHostBuilder
 
         builder.Services.AddRouting();
 
-        builder.Services.AddControllers();
+        // Only on by default in Development, so a singleton capturing a scoped service
+        // would otherwise only surface in production
+        builder.Host.UseDefaultServiceProvider(options =>
+        {
+            options.ValidateScopes = true;
+            options.ValidateOnBuild = true;
+        });
 
-        // This makes enums be returned as their keys rather than their values
+        // MVC, minimal APIs and SignalR each own a separate JsonSerializerOptions,
+        // configuring only one silently leaves the others on the framework defaults.
+        // The MVC one is also what Swashbuckle reads when generating the schema
+        // https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/2293
+        builder
+            .Services.AddControllers()
+            .AddJsonOptions(options => DefaultOptions(options.JsonSerializerOptions));
+
         builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
             DefaultOptions(options.SerializerOptions)
         );
 
         if (_useSwagger)
         {
-            // JSON OPTIONS
-            // https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/2293
-
-            // This makes Swagger report enums as their keys rather than their values
-            builder
-                .Services.AddControllers()
-                .AddJsonOptions(options => DefaultOptions(options.JsonSerializerOptions));
-
             void Custom(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)
             {
                 if (_useBearerToken)
@@ -132,7 +139,9 @@ public class SharedHostBuilder
 
         if (_useSignalR)
         {
-            builder.Services.AddSignalR(o => o.EnableDetailedErrors = true);
+            builder
+                .Services.AddSignalR(o => o.EnableDetailedErrors = true)
+                .AddJsonProtocol(options => DefaultOptions(options.PayloadSerializerOptions));
         }
 
         if (_useBearerToken)
@@ -252,7 +261,15 @@ public class SharedHostBuilder
         // Also recommended to be set to true for new projects by Microsoft
         options.RespectRequiredConstructorParameters = true;
 
+        // JavaScript clients and Postgres jsonb don't preserve key order, so the
+        // type discriminator isn't guaranteed to be the first property
+        options.AllowOutOfOrderMetadataProperties = true;
+
         options.Converters.Add(_jsonStringEnumConverter);
+
+        options.TypeInfoResolver = (
+            options.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver()
+        ).WithAddedModifier(PolymorphicTypeInfoModifier.WriteDiscriminatorForDerivedTypes);
 
         return options;
     }
