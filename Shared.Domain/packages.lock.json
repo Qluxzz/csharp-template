@@ -10,15 +10,15 @@
       },
       "Microsoft.VisualStudio.Threading.Analyzers": {
         "type": "Direct",
-        "requested": "[18.7.23, )",
-        "resolved": "18.7.23",
-        "contentHash": "dyj6z8m+LFjpeH69hdnciCcRCmD0YgMlvuQEywiEshjqj/blgQ+PuWX8Vd5gkWQFoBN4e+TFxx6DvGNSv/gIKg=="
+        "requested": "[18.12.1, )",
+        "resolved": "18.12.1",
+        "contentHash": "sQt7NpnselT1gP1a7bTfhmfHYV0jbavst/8mOoWTMSjXhXzWPssqgBoIwrxNsgJUa7XQzD2raSRMAFfmlepxNw=="
       },
       "Nullable.Extended.Analyzer": {
         "type": "Direct",
-        "requested": "[1.15.6581, )",
-        "resolved": "1.15.6581",
-        "contentHash": "lQ025E+aNR34QfXvRiHxNXTHK6JBkvpIIZD2IMk8QyROTZAkqs+PFasEa2xkIC+cN2C0Mw5MRnhX/Wrmz/qKfw=="
+        "requested": "[1.19.0, )",
+        "resolved": "1.19.0",
+        "contentHash": "SZf443/kZxsgQh+n3gr0WmwHY2Tq6FTM9Ai4GVddXHELkabx5LjdwrbGReI9XsEkm9GwH91dM7nUz8qb57BZ/g=="
       },
       "StronglyTypedId": {
         "type": "Direct",

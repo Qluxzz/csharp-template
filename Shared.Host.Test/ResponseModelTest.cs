@@ -41,7 +41,12 @@ public class ResponseModelTest
 
         var reader = new OpenApiJsonReader();
 
-        var (document, diagnostic) = reader.Read(stream, new Uri("http://localhost"), new());
+        var (document, diagnostic) = await reader.ReadAsync(
+            stream,
+            new Uri("http://localhost"),
+            new(),
+            cancellationToken
+        );
 
         Assert.NotNull(diagnostic);
         Assert.Empty(diagnostic.Warnings);
@@ -121,7 +126,12 @@ public class ResponseModelTest
 
         var reader = new OpenApiJsonReader();
 
-        var (document, diagnostic) = reader.Read(stream, new Uri("http://localhost"), new());
+        var (document, diagnostic) = await reader.ReadAsync(
+            stream,
+            new Uri("http://localhost"),
+            new(),
+            cancellationToken
+        );
 
         Assert.NotNull(diagnostic);
         Assert.Empty(diagnostic.Warnings);
