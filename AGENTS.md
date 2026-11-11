@@ -89,10 +89,21 @@ The worked examples live in `README.md` — read that section before writing any
 - **Don't let the types be driven by today's function.** If the representation only has a flag or an `int?` because one caller needed it, change the representation to what the domain actually is.
 - **These are ideals, not hard requirements.** Capturing every invariant in the type system isn't always practical. Leave a guard in place when you must, but comment the invariant so the next person knows it's deliberate rather than forgotten.
 
+# Tests
+
+Tests pin down behaviour so the implementation can change freely. A test that breaks under a correct refactor is a defect in the test: it sits at too low a level. Move it up to where the outcome is visible instead of rewriting it against the new internals. Tests should change only when behaviour changes, including the contract at a boundary (API payload, SignalR message, emitted event, endpoint response, published OpenAPI schema).
+
+- **Test at the highest level that stays fast and can still reach the cases**: an HTTP endpoint through `TestServer` (see `ResponseModelTest`), a SignalR hub. Go lower only for a unit with a contract of its own, such as pure domain logic with many edge cases or a converter shared by several callers (see `SerializesAndDeserializesAsPrefixedString` in `TypedIdTest`), and then drive it through its public API. Never test private helpers or internal state directly.
+- **Assert outcomes**: return values, persisted state, response bodies, published schemas, and what crosses a system boundary. Do not assert which in-process collaborators were called, how often, or in what order.
+- **Mock only what the code does not own**: external systems, the network or API client, and the clock (`TimeProvider`). Run in-process collaborators for real, or use a fake. Verifying a call on a boundary mock is fine when that call *is* the behaviour, for example the command sent to an external system or the request payload sent to an API. "Own" refers to the responsibility being replaced, not where the code lives: a project interface that wraps an external transport is a boundary, and replacing it through a real DI seam is fine. Use a real database (Testcontainers) rather than mocking repositories, `DbContext` or `IQueryable`; an in-memory query runs as LINQ to objects and misses translation failures and SQL semantics.
+- **Don't shape production code for tests.** That means no `InternalsVisibleTo`, visibility changes, flags or parameters that exist only so a test can reach in.
+- **Name tests after the rule they protect**, not the method under test (`EnumsShouldBeReturnedAsStrings`, `UnauthorizedAccessIsNotAllowedIfUseBearerTokenBeenCalled`).
+- **Before finishing, check both directions.** Would the test still pass if the implementation were rewritten correctly? Would it fail if the behaviour broke? Both answers must be yes. If you are unsure about the second, break the code briefly, watch the test fail, then revert the break and rerun.
+
 # Where the rest of the house style lives
 
 `README.md` is written to serve humans and agents alike — prefer extending it over duplicating it here.
 
-- `README.md` — controllers and `TypedResults`, error handling middleware, enum parsing footguns, public setters, `.Single`/`.First`, `JsonSerializer.Deserialize` nullability, Entity Framework naming.
+- `README.md` — controllers and `TypedResults`, error handling middleware, enum parsing footguns, public setters, `.Single`/`.First`, `JsonSerializer.Deserialize` nullability, Entity Framework naming, the `IQueryable` repository pattern.
 - `docs/RECORDS.md` — record equality and the reference-equality trap.
 - `Directory.Build.props` / `BannedSymbols.txt` / `.editorconfig` — the enforced configuration. Read these rather than guessing at the rules.

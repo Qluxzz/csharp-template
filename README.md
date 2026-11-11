@@ -414,3 +414,70 @@ options
 ```
 
 It reaches each id's backing `Guid` by reflecting over the private `Value` property and constructor the template generates, which is what lets one selector cover every id instead of a hand-written `ValueConverter` per type.
+
+## Repositories
+
+The classic repository has a method per question someone once asked of the data: `GetById`, `GetByUser`, `GetActiveByUserPaged`... Every new need means a new method threaded through the interface, the implementation and every fake in the tests. Or worse, someone avoids that by puzzling together the existing methods, so what should have been one query becomes several, the pagination from one method gets unwound in memory and then a brand new pagination result gets built on top.
+
+Instead, the repository only exposes an `IQueryable` for reading, a single bulk add and a single bulk update:
+
+```csharp
+public interface IRepository<T>
+    where T : class
+{
+    IQueryable<T> Query { get; }
+
+    Task Add(IReadOnlyCollection<T> entities, CancellationToken cancellationToken);
+
+    Task Update(IReadOnlyCollection<T> entities, CancellationToken cancellationToken);
+}
+
+public class Repository<T>(AppDbContext db) : IRepository<T>
+    where T : class
+{
+    public IQueryable<T> Query => db.Set<T>().AsNoTracking();
+
+    public async Task Add(IReadOnlyCollection<T> entities, CancellationToken cancellationToken)
+    {
+        db.Set<T>().AddRange(entities);
+        await db.SaveChangesAsync(cancellationToken);
+        db.ChangeTracker.Clear();
+    }
+
+    public async Task Update(IReadOnlyCollection<T> entities, CancellationToken cancellationToken)
+    {
+        db.Set<T>().UpdateRange(entities);
+        await db.SaveChangesAsync(cancellationToken);
+        db.ChangeTracker.Clear();
+    }
+}
+```
+
+There's only one add and one update, both take a collection, so a single entity is just `Add([order], ct)` or `Update([order with { Status = OrderStatus.Shipped }], ct)`. Reads are `AsNoTracking` and the change tracker is cleared after every save, so nothing is tracked between calls. That's what lets update work with [records without public setters](#public-setters-considered-harmful): you read an entity, create a copy with `with { ... }` and hand the copy to `Update`, without EF complaining that another instance with the same key is already tracked.
+
+Each query is then written where it's needed, either directly in the controller, or in a service if there's business logic involved, and it becomes exactly one SQL query with the filtering, ordering, paging and projection done in the database:
+
+```csharp
+public async Task<Ok<Page<OrderSummary>>> GetOrders(
+    UserId userId,
+    int page,
+    CancellationToken cancellationToken
+)
+{
+    var query = orders.Query.Where(o => o.UserId == userId);
+
+    var items = await query
+        .OrderByDescending(o => o.CreatedAt)
+        .Skip(page * PageSize)
+        .Take(PageSize)
+        .Select(o => new OrderSummary(o.Id, o.Total))
+        .ToListAsync(cancellationToken);
+
+    return TypedResults.Ok(new Page<OrderSummary>(items, await query.CountAsync(cancellationToken)));
+}
+```
+
+The trade-offs, so you go in with your eyes open:
+
+- Faking the repository is easy, [MockQueryable](https://github.com/ramantsitou/MockQueryable) turns a list into an async-capable `IQueryable`. But a fake runs the query as LINQ to objects, so it won't catch a query EF can't translate to SQL, or where SQL semantics differ from C# (collation, null comparisons). That's true whether the query lives in the caller or behind a repository method, so prefer testing through the endpoint against a real database (e.g. Testcontainers).
+- Every `Add`/`Update` is its own `SaveChanges` and its own transaction. That's why both take a collection, but if you need to write different entity types atomically you need an explicit transaction around the calls.
