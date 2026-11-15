@@ -21,6 +21,15 @@ dotnet restore --force-evaluate          # run this after ANY package change, an
 
 That is the only place to pass an override. Every other restore stays in locked mode, so an unintended dependency change fails loudly instead of silently rewriting the graph.
 
+`dotnet add package` restores implicitly, so in locked mode it fails with `NU1004` on the version it was just told to write. Pass `--no-restore` to any command that changes a version and then regenerate the lock files in the separate step above. That includes `dotnet outdated -u`, which shells out to `dotnet add package`:
+
+```bash
+dotnet outdated -u --no-restore          # bump versions without the implicit restore
+dotnet restore --force-evaluate          # then regenerate the committed lock files
+```
+
+`--no-restore` also skips dotnet-outdated's restore preview, so it applies a major version that conflicts with another package without complaint — Swashbuckle 11 needing `Microsoft.OpenApi` 3.x while `Microsoft.AspNetCore.OpenApi` 10 pins `< 3.0.0` is the current example, which is why Swashbuckle is pinned to 10.x in `Directory.Packages.props`. Review the report and run the full `dotnet test` afterwards. A failed upgrade can leave half-written lock files, which surface as `NU1101` rather than the underlying version conflict; fixing the versions and re-running `dotnet restore --force-evaluate` clears that (delete the lock files if it does not).
+
 Packages are centrally versioned in `Directory.Packages.props`. Never put a `Version=` on a `PackageReference`.
 
 While iterating, run the narrowest useful scope — a single test project, or `dotnet test --filter <name>` — and run the full `dotnet test` plus `csharpier check .` before you call the work done.

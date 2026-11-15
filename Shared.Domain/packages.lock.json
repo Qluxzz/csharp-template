@@ -28,9 +28,9 @@
       },
       "Tetractic.CodeAnalysis.ExceptionAnalyzers": {
         "type": "Direct",
-        "requested": "[1.4.9, )",
-        "resolved": "1.4.9",
-        "contentHash": "OekYnVuwDReSTRSJeZiA+tFrh5S2VKot87IgIe7trqgIAjE6/EZw5TTRQyRAeDPX3wGitHFlzgfvqDRXqRrWSw=="
+        "requested": "[1.5.0, )",
+        "resolved": "1.5.0",
+        "contentHash": "GVeN1E9jSopcKLZt6JkoQjcu6NWzYTZA3WXe2d2acCBACKVth3U0jw2RPt0SVeJ5XeF2LYjULHyXGg/QUtlvSg=="
       }
     }
   }
