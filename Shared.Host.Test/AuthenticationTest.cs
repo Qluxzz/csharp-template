@@ -17,17 +17,14 @@ public class AuthenticationTest
     public async Task UnauthorizedAccessIsAllowedIfUseBearerTokenHasntBeenCalled()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var host = new SharedHostBuilder().Build(
-            _noArgs,
-            (_, services) =>
-            {
-                // This is what .UseTestServer does
-                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                services.AddSingleton<IServer, TestServer>();
+        var host = new SharedHostBuilder().Build(_noArgs, (_, services) =>
+        {
+            // This is what .UseTestServer does
+            services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+            services.AddSingleton<IServer, TestServer>();
 
-                services.AddEndpointsApiExplorer();
-            }
-        );
+            services.AddEndpointsApiExplorer();
+        });
 
         var response = "You should see this without passing a bearer token!";
 
@@ -48,17 +45,14 @@ public class AuthenticationTest
 
         var host = new SharedHostBuilder()
             .WithBearerToken(new("test-api", "test", key))
-            .Build(
-                _noArgs,
-                (_, services) =>
-                {
-                    // This is what .UseTestServer does
-                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                    services.AddSingleton<IServer, TestServer>();
+            .Build(_noArgs, (_, services) =>
+            {
+                // This is what .UseTestServer does
+                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                services.AddSingleton<IServer, TestServer>();
 
-                    services.AddEndpointsApiExplorer();
-                }
-            );
+                services.AddEndpointsApiExplorer();
+            });
 
         var response = "You should not see this without passing a bearer token!";
 

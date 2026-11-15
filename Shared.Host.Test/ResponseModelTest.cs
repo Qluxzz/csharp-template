@@ -18,17 +18,14 @@ public class ResponseModelTest
         var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .Build(
-                _noArgs,
-                (_, services) =>
-                {
-                    // This is what .UseTestServer does
-                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                    services.AddSingleton<IServer, TestServer>();
+            .Build(_noArgs, (_, services) =>
+            {
+                // This is what .UseTestServer does
+                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                services.AddSingleton<IServer, TestServer>();
 
-                    services.AddEndpointsApiExplorer();
-                }
-            );
+                services.AddEndpointsApiExplorer();
+            });
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithNullableEnum(TestEnum.Baz)));
 
@@ -76,17 +73,14 @@ public class ResponseModelTest
         var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .Build(
-                _noArgs,
-                (_, services) =>
-                {
-                    // This is what .UseTestServer does
-                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                    services.AddSingleton<IServer, TestServer>();
+            .Build(_noArgs, (_, services) =>
+            {
+                // This is what .UseTestServer does
+                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                services.AddSingleton<IServer, TestServer>();
 
-                    services.AddEndpointsApiExplorer();
-                }
-            );
+                services.AddEndpointsApiExplorer();
+            });
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithEnum(TestEnum.Bar)));
 
@@ -103,17 +97,14 @@ public class ResponseModelTest
         var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .Build(
-                _noArgs,
-                (_, services) =>
-                {
-                    // This is what .UseTestServer does
-                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                    services.AddSingleton<IServer, TestServer>();
+            .Build(_noArgs, (_, services) =>
+            {
+                // This is what .UseTestServer does
+                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                services.AddSingleton<IServer, TestServer>();
 
-                    services.AddEndpointsApiExplorer();
-                }
-            );
+                services.AddEndpointsApiExplorer();
+            });
 
         host.MapGet("/test", () => TypedResults.Ok(new TestWithEnum(TestEnum.Baz)));
 

@@ -61,10 +61,9 @@ public static class PolymorphicTypeInfoModifier
 
             typeInfo.PolymorphismOptions = new JsonPolymorphismOptions
             {
-                TypeDiscriminatorPropertyName =
-                    candidate
-                        .GetCustomAttribute<JsonPolymorphicAttribute>(inherit: false)
-                        ?.TypeDiscriminatorPropertyName
+                TypeDiscriminatorPropertyName = candidate
+                    .GetCustomAttribute<JsonPolymorphicAttribute>(inherit: false)
+                    ?.TypeDiscriminatorPropertyName
                     ?? _defaultDiscriminatorProperty,
                 DerivedTypes = { new JsonDerivedType(typeInfo.Type, id) },
             };

@@ -75,15 +75,12 @@ public class JsonOptionsTest
     public async Task DerivedTypeReturnedDirectlyShouldIncludeDiscriminator()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var host = new SharedHostBuilder().Build(
-            _noArgs,
-            (_, services) =>
-            {
-                // This is what .UseTestServer does
-                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                services.AddSingleton<IServer, TestServer>();
-            }
-        );
+        var host = new SharedHostBuilder().Build(_noArgs, (_, services) =>
+        {
+            // This is what .UseTestServer does
+            services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+            services.AddSingleton<IServer, TestServer>();
+        });
 
         host.MapGet("/cats", () => TypedResults.Ok(new List<Cat> { new(9) }));
 
@@ -139,14 +136,11 @@ public class JsonOptionsTest
     public void SingletonCapturingScopedServiceShouldFailAtBuild()
     {
         var exception = Assert.Throws<AggregateException>(() =>
-            new SharedHostBuilder().Build(
-                _noArgs,
-                (_, services) =>
-                {
-                    services.AddScoped<ScopedDependency>();
-                    services.AddSingleton<SingletonCapturingScoped>();
-                }
-            )
+            new SharedHostBuilder().Build(_noArgs, (_, services) =>
+            {
+                services.AddScoped<ScopedDependency>();
+                services.AddSingleton<SingletonCapturingScoped>();
+            })
         );
 
         Assert.Contains(nameof(ScopedDependency), exception.Message);
