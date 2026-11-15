@@ -37,17 +37,14 @@ public class TypedIdTest
         var id = ExampleId.New();
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .Build(
-                _noArgs,
-                (_, services) =>
-                {
-                    // This is what .UseTestServer does
-                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                    services.AddSingleton<IServer, TestServer>();
+            .Build(_noArgs, (_, services) =>
+            {
+                // This is what .UseTestServer does
+                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                services.AddSingleton<IServer, TestServer>();
 
-                    services.AddEndpointsApiExplorer();
-                }
-            );
+                services.AddEndpointsApiExplorer();
+            });
 
         host.MapGet("/example", () => TypedResults.Ok(new ExampleResponse(id)));
 
@@ -64,17 +61,14 @@ public class TypedIdTest
         var cancellationToken = TestContext.Current.CancellationToken;
         var host = new SharedHostBuilder()
             .WithSwagger()
-            .Build(
-                _noArgs,
-                (_, services) =>
-                {
-                    // This is what .UseTestServer does
-                    services.AddSingleton<IHostLifetime, NoopHostLifetime>();
-                    services.AddSingleton<IServer, TestServer>();
+            .Build(_noArgs, (_, services) =>
+            {
+                // This is what .UseTestServer does
+                services.AddSingleton<IHostLifetime, NoopHostLifetime>();
+                services.AddSingleton<IServer, TestServer>();
 
-                    services.AddEndpointsApiExplorer();
-                }
-            );
+                services.AddEndpointsApiExplorer();
+            });
 
         host.MapGet("/example", () => TypedResults.Ok(new ExampleResponse(ExampleId.New())));
 

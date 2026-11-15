@@ -54,15 +54,12 @@ public class SignalRTest
         var url = $"http://localhost:5000{ITestHub.Pattern}";
 
         var connection = new HubConnectionBuilder()
-            .WithUrl(
-                url,
-                options =>
-                {
-                    options.SkipNegotiation = true;
-                    options.Transports = HttpTransportType.WebSockets;
-                    options.AccessTokenProvider = () => Task.FromResult<string?>(token);
-                }
-            )
+            .WithUrl(url, options =>
+            {
+                options.SkipNegotiation = true;
+                options.Transports = HttpTransportType.WebSockets;
+                options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+            })
             .WithAutomaticReconnect()
             .Build();
 
