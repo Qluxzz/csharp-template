@@ -175,6 +175,40 @@ public record Foo(int Bar, int Baz);
 
 https://gist.github.com/Qluxzz/706043bc37d0d1030e1cd9d3841918f5
 
+### Custom types with validation and Swagger representation
+
+Sometimes you have an identifier or something similar that you want to validate before continuing further into the application ([Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)). You also want it to be easy for the consumers of your API, so they send a plain string and the backend works with a custom type.
+
+Since .NET 7 this is possible with [static abstract interface members](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-11.0/static-abstracts-in-interfaces) through [`IParsable<T>`](https://learn.microsoft.com/en-us/dotnet/api/system.iparsable-1), which defines how to turn a string into your type. (Before .NET 7 the same could be done with a [type converter](https://learn.microsoft.com/en-us/dotnet/api/system.componentmodel.typeconverter).)
+
+As an example, Auth0 user ids have a specific format: they start with `auth0|` followed by the id. Wouldn't it be nice if the model binder validated that for us, so that once we're inside the endpoint we _know_ we have a valid Auth0 id?
+
+The full working version is [`Shared.Domain/Auth0Id.cs`](Shared.Domain/Auth0Id.cs), and it's tested end to end in [`Shared.Host.Test/ParsedTypeTest.cs`](Shared.Host.Test/ParsedTypeTest.cs). It takes three pieces:
+
+1. **`IParsable<T>`** with a private constructor, so the only way to get an `Auth0Id` is through `Parse`/`TryParse`. Route and query parameters bind through it, and a value that fails to parse returns `400 Bad Request` before your endpoint runs.
+2. **A `JsonConverter`**, attached with `[JsonConverter(...)]`, for request and response bodies. System.Text.Json ignores `IParsable<T>`, so without a converter a `[FromBody]` field would not be parsed. The converter must throw `JsonException` on invalid input, since that's what the model binder turns into a 400; [any other exception becomes a 500](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/converters-how-to#when-to-throw-which-exception-type). If the type is used as a dictionary key, also override `ReadAsPropertyName`/`WriteAsPropertyName`. `ArchitectureTest.ParsedDomainTypesDeclareAJsonConverter` fails if a parsed type in `Shared.Domain` forgets the attribute.
+3. **`IParsedString<T>`** instead of `IParsable<T>` directly, so the type owns its Swagger representation. To Swashbuckle the type is a class and would be documented as an empty object. `IParsedString<T>` adds two static members, `Pattern` and `Example`, and `ParsedStringSchemaFilter` in [`Shared.Host/Swagger`](Shared.Host/Swagger/ParsedStringSchemaFilter.cs) documents every type implementing it as a string with that pattern and example, in bodies as well as route and query parameters. Nothing has to be registered per type, and `Shared.Domain` doesn't have to reference OpenAPI. `ArchitectureTest.ParsedDomainTypesDescribeTheirOpenApiSchema` fails if a parsed type implements plain `IParsable<T>` instead:
+
+```csharp
+public sealed record Auth0Id : IParsedString<Auth0Id>
+{
+    public static string Pattern => @"^auth0\|.+$";
+    public static string Example => "auth0|507f1f77bcf86cd799439011";
+    ...
+}
+```
+
+This also works together with `[Required]` and nullable modifiers. Your endpoint then looks like this:
+
+```csharp
+[HttpGet("{id}")]
+public Ok<User> GetUserById(Auth0Id id)
+{
+    // In here, id is guaranteed to be a valid Auth0 id
+    ...
+}
+```
+
 ## Type-safe IDs
 
 If every id in your system is a `Guid`, the compiler can't stop you from passing a user's id where an order's id was expected, and nothing stops you from swapping the arguments in `Transfer(Guid from, Guid to)`. The id is "just a `Guid`", so all the meaning lives in your head and in variable names.

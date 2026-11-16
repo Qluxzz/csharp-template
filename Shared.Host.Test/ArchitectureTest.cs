@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 using Shared.Domain;
 using StronglyTypedIds;
 
@@ -19,12 +20,24 @@ public class ArchitectureTest
             .GetTypes()
             .Where(t => t.GetCustomAttribute<StronglyTypedIdAttribute>() is not null);
 
+    private static IEnumerable<Type> ParsedTypes() =>
+        _domainAssembly
+            .GetExportedTypes()
+            .Where(t =>
+                !t.IsInterface
+                && t.GetInterfaces()
+                    .Any(i =>
+                        i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IParsable<>)
+                    )
+            );
+
     [Fact]
     public void ReflectionFindsTheTypesTheRulesAreCheckedAgainst()
     {
         // Without this, a refactor that makes the queries below find nothing would let every
         // other test in this class pass vacuously.
         Assert.Contains(typeof(ExampleId), StronglyTypedIds());
+        Assert.Contains(typeof(Auth0Id), ParsedTypes());
     }
 
     [Fact]
@@ -41,6 +54,38 @@ public class ArchitectureTest
                 )?.PropertyType != typeof(Guid)
                 || t.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, [typeof(Guid)])
                     is null
+            )
+            .Select(t => t.FullName);
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void ParsedDomainTypesDeclareAJsonConverter()
+    {
+        // IParsable<T> covers route and query binding, but System.Text.Json ignores it, so a
+        // parsed type without a converter would bind from a [FromBody] payload as an empty
+        // object instead of failing. See "Custom types with validation" in README.md.
+        var violations = ParsedTypes()
+            .Where(t => t.GetCustomAttribute<JsonConverterAttribute>() is null)
+            .Select(t => t.FullName);
+
+        Assert.Empty(violations);
+    }
+
+    [Fact]
+    public void ParsedDomainTypesDescribeTheirOpenApiSchema()
+    {
+        // ParsedStringSchemaFilter only documents types implementing IParsedString<T>; any other
+        // parsed type shows up in Swagger as an empty object. Strongly typed ids are parsable too,
+        // but StronglyTypedIdSchemaFilter documents them.
+        var violations = ParsedTypes()
+            .Except(StronglyTypedIds())
+            .Where(t =>
+                !t.GetInterfaces()
+                    .Any(i =>
+                        i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IParsedString<>)
+                    )
             )
             .Select(t => t.FullName);
 

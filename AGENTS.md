@@ -72,6 +72,27 @@ Source: https://cbarrete.com/carmack.html — "John Carmack on inlined code and 
 - **Prefer pure functions.** Near-pure work should take inputs and return a value without reading or mutating global/ambient state. Pass in the one or two pieces of state it needs rather than reaching for globals, even if that means more parameter passing. Refactor toward purity on a continuum: "spaghetti-state → mostly-pure" is a big win; "almost-pure → fully-pure" is a small one.
 - **Return copies, don't mutate.** Prefer a method that returns a transformed copy over one that mutates its receiver in place. This matters more in C# than it looks: mutable state behind a shared reference is what makes a `record`'s generated `Equals` lie (`docs/RECORDS.md`). The concern is *shared* mutable state in value-like domain data, not mutation as such — mutating something you privately own, where the domain genuinely is mutable, is still fine.
 
+Source: https://fsharpforfunandprofit.com/posts/designing-with-types-making-illegal-states-unrepresentable/ — "Making illegal states unrepresentable".
+
+- **Make illegal states unrepresentable.** Design types so a value that breaks a business rule can't be constructed at all, instead of checking for it in every function that receives one. The tell is a type whose fields are only valid in certain combinations: two nullable fields where "at least one must be set", a `Status` enum plus fields that only mean something for one status, a `bool` that decides which other fields are filled in. Every consumer then has to remember the rule, and one eventually won't. Model each valid combination as its own case instead:
+
+  ```csharp
+  // "A contact needs an email, a postal address, or both" — but nothing stops both being null.
+  public record Contact(string Name, Email? Email, PostalAddress? Address);
+
+  // Each valid combination is a case; the invalid one has no constructor.
+  public abstract record ContactInfo
+  {
+      private ContactInfo() { } // closes the hierarchy: no cases can be added outside this type
+      public sealed record EmailOnly(Email Email) : ContactInfo;
+      public sealed record PostOnly(PostalAddress Address) : ContactInfo;
+      public sealed record EmailAndPost(Email Email, PostalAddress Address) : ContactInfo;
+  }
+  public record Contact(string Name, ContactInfo ContactInfo);
+  ```
+
+  C# has no closed unions yet, so a `switch` over `ContactInfo` still needs a `_ => throw new UnreachableException(...)` arm and adding a case isn't a compile error at the call sites. The private constructor and the type's own definition are still where the rule lives, which beats it living in every caller. Smaller versions of the same idea are a strongly typed id instead of a `Guid`, a parsed type instead of a validated `string` (see Parsing), and a non-nullable property instead of a nullable one plus a comment. When the compiler can't carry the rule, fall back to an architecture test, as described in "Making invalid states impossible" below.
+
 # Comments
 
 - **A comment earns its place only by explaining a why the code cannot show.** Never restate what the code says. Keep a comment only when something invisible forces a non-obvious choice: a library or protocol constraint, a domain rule, a deliberate trade-off, or an invariant the types can't carry. When you *do* need to say "this can't happen", say it and say why — a bare `throw` with no explanation is worse than none.
@@ -89,14 +110,31 @@ Source: https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction
 
 # Parsing
 
-The worked examples live in `README.md` — read that section before writing anything that takes external input. The general principle, which the README assumes rather than restates:
+The worked examples live in `README.md` — read that section before writing anything that takes external input. `Shared.Domain/Auth0Id.cs` is the reference implementation of a parsed type: `IParsedString<T>` (an `IParsable<T>` that also declares its OpenAPI `Pattern` and `Example`, picked up by `ParsedStringSchemaFilter`) and a `JsonConverter` for bodies. Copy its shape for new ones. The general principle, which the README assumes rather than restates:
 
 - **Parse, don't validate.** A parser takes less-structured input and hands back more-structured output, preserving in its return type what it learned. A validator throws that knowledge away and makes every caller re-derive it.
 - **Push the burden of proof up to the boundary, but no further.** Parse once at the entry point, then let the interior assume validity. That boundary may be the framework's own hook — `IParsable<T>` binding, a `JsonConverter` for `[FromBody]` — which is still the entrypoint. Don't parse below it.
 - **Never act on partially-valid input.** Split work into a parse phase where all failures happen, then an execution phase.
 - **Keep the published schema honest.** A refined input type still has to be documented as the `string`/`integer` it is on the wire, or every generated client churns. Don't guess what Swashbuckle will do — check it. This repo leans on `RespectRequiredConstructorParameters` and the enum converter for exactly this; see `DefaultOptions` in `Shared.Host/HostBuilder.cs` and the tests in `Shared.Host.Test/ResponseModelTest.cs`.
 - **Don't let the types be driven by today's function.** If the representation only has a flag or an `int?` because one caller needed it, change the representation to what the domain actually is.
-- **These are ideals, not hard requirements.** Capturing every invariant in the type system isn't always practical. Leave a guard in place when you must, but comment the invariant so the next person knows it's deliberate rather than forgotten.
+- **These are ideals, not hard requirements.** Capturing every invariant in the type system isn't always practical. Leave a guard in place when you must, but comment the invariant so the next person knows it's deliberate rather than forgotten. If the invariant is about the shape of the code rather than a runtime value, an architecture test is usually a better fallback than a guard — see below.
+
+# Making invalid states impossible
+
+Enforce a rule at the earliest point that can catch it, in this order:
+
+1. **The type system.** Make the invalid state unrepresentable so breaking the rule is a compiler error: a strongly typed id instead of a `Guid`, a record with no public setters instead of a mutable class, `Results<...>` instead of `IActionResult`, a parsed type instead of a validated `string`. This is always the first choice — it costs nothing at runtime and the feedback is immediate. See "Make illegal states unrepresentable" under Coding style.
+2. **An analyzer or banned symbol.** When the rule is "never call X", `BannedSymbols.txt` or an existing analyzer turns it into a build error.
+3. **An architecture test.** When the rule spans types and the compiler can't express it — "every id lives in this namespace and has a private `Guid` constructor", "domain types have no public setters", "every endpoint declares its authorization" — add a reflection-based test to `Shared.Host.Test/ArchitectureTest.cs`. A convention that only lives in a README or in review comments will eventually be broken; a test that names the offending type won't let it.
+4. **A runtime guard**, only when none of the above can reach it, with a comment stating the invariant.
+
+When writing an architecture test:
+
+- **Name it after the rule and point at why it exists** (the README section, or the code that depends on it), so whoever trips it knows whether to fix their type or question the rule.
+- **Collect every violation and assert on the list** (`Assert.Empty(violations)`), so the failure names each offending type instead of stopping at the first.
+- **Guard against passing vacuously.** A reflection query that silently finds nothing after a refactor makes every rule pass. Keep `ReflectionFindsTheTypesTheRulesAreCheckedAgainst` asserting that a known type is discovered, and extend it when you add a query over a new set of types.
+- **Don't add a rule with nothing to check yet.** A test over zero types proves nothing; add it alongside the first type it applies to.
+- **Break it once.** Add a type that violates the rule, watch the test fail with a useful message, then remove it — the same "check both directions" rule as any other test.
 
 # Tests
 

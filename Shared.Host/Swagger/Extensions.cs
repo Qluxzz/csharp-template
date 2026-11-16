@@ -27,6 +27,11 @@ public static class Extensions
             // This filter makes the OpenAPI schema report them as that string instead of an object.
             options.SchemaFilter<StronglyTypedIdSchemaFilter>();
 
+            // Parsed types travel as strings but are classes in C#, without this
+            // Swashbuckle documents them as an empty object.
+            options.SchemaFilter<ParsedStringSchemaFilter>();
+            options.ParameterFilter<ParsedStringSchemaFilter>();
+
             if (custom is not null)
                 custom(options);
         });

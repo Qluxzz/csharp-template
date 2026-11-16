@@ -430,6 +430,7 @@
         "dependencies": {
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.15, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.15, )",
+          "Shared.Domain": "[1.0.0, )",
           "SignalRSwaggerGen": "[4.9.0, )",
           "StronglyTypedId": "[1.0.0-beta08, )",
           "Swashbuckle.AspNetCore": "[10.3.1, )"
