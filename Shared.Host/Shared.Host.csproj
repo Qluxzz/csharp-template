@@ -14,5 +14,11 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Shared.Domain\Shared.Domain.csproj" />
+    <!-- Generates the boilerplate of every [ParsedString] type -->
+    <ProjectReference
+      Include="..\Shared.Domain.Generators\Shared.Domain.Generators.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
+    />
   </ItemGroup>
 </Project>

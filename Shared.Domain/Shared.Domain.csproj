@@ -14,6 +14,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Generates the boilerplate of every [ParsedString] type -->
+    <ProjectReference
+      Include="..\Shared.Domain.Generators\Shared.Domain.Generators.csproj"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
+    />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The template the source generator expands every [StronglyTypedId] struct with. -->
     <AdditionalFiles Include="guid-json.typedid" />
   </ItemGroup>

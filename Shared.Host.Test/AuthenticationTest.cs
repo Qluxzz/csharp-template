@@ -44,7 +44,7 @@ public class AuthenticationTest
         var (key, token) = Test();
 
         var host = new SharedHostBuilder()
-            .WithBearerToken(new("test-api", "test", key))
+            .WithBearerToken(new(JwtAudience.Parse("test-api"), JwtIssuer.Parse("test"), key))
             .Build(_noArgs, (_, services) =>
             {
                 // This is what .UseTestServer does
@@ -70,6 +70,35 @@ public class AuthenticationTest
         test = await testClient.GetAsync("/test", cancellationToken);
         Assert.Equal(System.Net.HttpStatusCode.OK, test.StatusCode);
         Assert.Equal(response, await test.Content.ReadAsStringAsync(cancellationToken));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(":my-api")]
+    [InlineData("https://")]
+    [InlineData("1http://api.example.com")]
+    public void BearerTokenIssuerAndAudienceRejectValuesOutsideStringOrUri(string? value)
+    {
+        // RFC 7519 §2: any string, but one containing ':' must be a URI. Anything else can
+        // never match a token, which would only surface as 401s at runtime.
+        Assert.False(JwtIssuer.TryParse(value, null, out _));
+        Assert.False(JwtAudience.TryParse(value, null, out _));
+    }
+
+    [Theory]
+    [InlineData("https://api.example.com")] // Auth0 API identifier
+    [InlineData("6e74172b-be56-4843-9ff4-e66a39bb12e3")] // Entra ID v2 client id
+    [InlineData("api://default")] // Okta default authorization server
+    [InlineData("urn:example:api")]
+    [InlineData("1234-abc.apps.googleusercontent.com")] // Google client id
+    [InlineData("sts.amazonaws.com")]
+    [InlineData("test-api")]
+    public void BearerTokenIssuerAndAudienceAcceptWhatRealProvidersUse(string value)
+    {
+        Assert.True(JwtIssuer.TryParse(value, null, out _));
+        Assert.True(JwtAudience.TryParse(value, null, out _));
     }
 
     private static (SymmetricSecurityKey SigningKey, string Token) Test()

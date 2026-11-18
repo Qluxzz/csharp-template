@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -21,12 +20,10 @@ using static System.Net.Mime.MediaTypeNames;
 namespace Shared.Host;
 
 public record BearerTokenSettings(
-    string ValidAudience,
-    string ValidateIssuer,
+    JwtAudience ValidAudience,
+    JwtIssuer ValidIssuer,
     SymmetricSecurityKey SigningKey
 );
-
-public record SignalRSettings(Dictionary<Hub, string> Hubs);
 
 public class SharedHostBuilder
 {
@@ -34,8 +31,6 @@ public class SharedHostBuilder
 
     private bool _useSignalR { get; set; }
 
-    [MemberNotNullWhen(true, nameof(_bearerTokenSettings))]
-    private bool _useBearerToken { get; set; }
     private BearerTokenSettings? _bearerTokenSettings = null;
 
     public SharedHostBuilder WithSwagger()
@@ -57,7 +52,6 @@ public class SharedHostBuilder
     /// <returns></returns>
     public SharedHostBuilder WithBearerToken(BearerTokenSettings settings)
     {
-        _useBearerToken = true;
         _bearerTokenSettings = settings;
         return this;
     }
@@ -104,7 +98,7 @@ public class SharedHostBuilder
         {
             void Custom(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)
             {
-                if (_useBearerToken)
+                if (_bearerTokenSettings is not null)
                 {
                     // This allows you to impersonate users by supplying their bearer token directly
                     const string impersonateUser = "Impersonate user";
@@ -144,7 +138,7 @@ public class SharedHostBuilder
                 .AddJsonProtocol(options => DefaultOptions(options.PayloadSerializerOptions));
         }
 
-        if (_useBearerToken)
+        if (_bearerTokenSettings is { } bearerTokenSettings)
         {
             builder
                 .Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -153,12 +147,12 @@ public class SharedHostBuilder
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
-                        ValidIssuer = _bearerTokenSettings.ValidateIssuer,
+                        ValidIssuer = bearerTokenSettings.ValidIssuer.ToString(),
                         ValidateAudience = true,
-                        ValidAudience = _bearerTokenSettings.ValidAudience,
+                        ValidAudience = bearerTokenSettings.ValidAudience.ToString(),
                         ValidateLifetime = true,
                         ValidateIssuerSigningKey = true,
-                        IssuerSigningKey = _bearerTokenSettings.SigningKey,
+                        IssuerSigningKey = bearerTokenSettings.SigningKey,
                     };
 
                     if (_useSignalR)
@@ -224,7 +218,7 @@ public class SharedHostBuilder
             );
         }
 
-        if (_useBearerToken)
+        if (_bearerTokenSettings is not null)
         {
             app.UseAuthentication();
             app.UseAuthorization();

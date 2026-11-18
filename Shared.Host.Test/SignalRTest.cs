@@ -44,7 +44,7 @@ public class SignalRTest
 
         var host = new SharedHostBuilder()
             .WithSignalR()
-            .WithBearerToken(new("test-api", "test", key))
+            .WithBearerToken(new(JwtAudience.Parse("test-api"), JwtIssuer.Parse("test"), key))
             .Build(_noArgs);
 
         host.MapHub<TestHub>(ITestHub.Pattern);
@@ -80,7 +80,7 @@ public class SignalRTest
 
         var host = new SharedHostBuilder()
             .WithSignalR()
-            .WithBearerToken(new("test-api", "test", key))
+            .WithBearerToken(new(JwtAudience.Parse("test-api"), JwtIssuer.Parse("test"), key))
             .Build(_noArgs);
 
         host.MapHub<TestHub>(ITestHub.Pattern);
