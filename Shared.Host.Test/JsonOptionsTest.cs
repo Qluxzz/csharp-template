@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Shared.Domain;
 using Shared.Host.Json;
 
 namespace Shared.Host.Test;
@@ -68,6 +69,13 @@ public class JsonOptionsTest
                 JsonSerializer.Serialize(new Cat(9), options)
             );
             Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<WithEnum>("{}", options));
+            Assert.Throws<JsonException>(() =>
+                JsonSerializer.Deserialize<WithAuth0Id>("""{"id":null}""", options)
+            );
+            Assert.Equal(
+                new WithOptionalAuth0Id(null),
+                JsonSerializer.Deserialize<WithOptionalAuth0Id>("""{"id":null}""", options)
+            );
         }
     }
 
@@ -159,6 +167,10 @@ public class JsonOptionsTest
     }
 
     public record WithEnum(TestEnum TestEnum);
+
+    public record WithAuth0Id(Auth0Id Id);
+
+    public record WithOptionalAuth0Id(Auth0Id? Id);
 
     [JsonDerivedType(typeof(Cat), "cat")]
     public abstract record Animal;

@@ -261,6 +261,11 @@ public class SharedHostBuilder
         // Also recommended to be set to true for new projects by Microsoft
         options.RespectRequiredConstructorParameters = true;
 
+        // Without this a JSON null is written straight into a non-nullable reference property,
+        // since converters aren't called for null, so a parsed type like Auth0Id could be null
+        // where the compiler believes it can't be
+        options.RespectNullableAnnotations = true;
+
         // JavaScript clients and Postgres jsonb don't preserve key order, so the
         // type discriminator isn't guaranteed to be the first property
         options.AllowOutOfOrderMetadataProperties = true;
