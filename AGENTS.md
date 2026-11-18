@@ -64,17 +64,25 @@ These are compiler errors here, not preferences. `TreatWarningsAsErrors` is on a
 
 # Coding style
 
-Source: https://cbarrete.com/carmack.html — "John Carmack on inlined code and functional programming". Apply these when writing or refactoring code.
+The guide has three goals. Each rule below serves one of them. When a rule seems to argue against a goal in a specific case, follow the goal.
 
-- **Inline single-use functions.** If a helper is called from exactly one place, inline it into the caller instead of extracting it. Prefer fewer, larger, sequential functions over a tree of tiny helpers. Sequential work should read top-to-bottom in one place — ignore the "functions should be a page or two long" rule of thumb. This is a default, not a transformation to apply mechanically: keep a single-use helper when its name genuinely clarifies intent, when it isolates an invariant worth pinning down, or when inlining leaves the caller buried in nesting. Extraction that adds a name you have to look up is not abstraction, it's indirection.
-- **Collapse call sites.** Avoid `FullUpdate()` calling `PartialUpdateA()`/`PartialUpdateB()` when a caller just needs one part: if a function is called from many places, see if the full work can be done once in a single place and the unneeded part inhibited there. Merging call sites this way is only worth it when the shared path stays simple — if it grows a parameter for every caller, you have built the wrong abstraction (see below).
-- **Centralize side effects.** Within the execution phase, prefer doing the operation and then inhibiting or ignoring the result over conditionally performing it in scattered places. Fewer conditional branches means consistent execution paths and fewer state surprises. This governs _where_ effects live, not whether the computation that decides them is pure.
-- **Prefer pure functions.** Near-pure work should take inputs and return a value without reading or mutating global/ambient state. Pass in the one or two pieces of state it needs rather than reaching for globals, even if that means more parameter passing. Refactor toward purity on a continuum: "spaghetti-state → mostly-pure" is a big win; "almost-pure → fully-pure" is a small one.
-- **Return copies, don't mutate.** Prefer a method that returns a transformed copy over one that mutates its receiver in place. This matters more in C# than it looks: mutable state behind a shared reference is what makes a `record`'s generated `Equals` lie (`docs/RECORDS.md`). The concern is *shared* mutable state in value-like domain data, not mutation as such — mutating something you privately own, where the domain genuinely is mutable, is still fine.
+1. **A reader can follow the code top to bottom** without jumping between helpers or tracing flags.
+2. **The types carry the rules**, so a value that breaks a business rule can't be constructed, and no caller has to remember the rule.
+3. **State and side effects stay where you can see them**, so the same input gives the same result.
 
-Source: https://fsharpforfunandprofit.com/posts/designing-with-types-making-illegal-states-unrepresentable/ — "Making illegal states unrepresentable".
+Background reading, not rules: [Carmack on inlined code](https://cbarrete.com/carmack.html), [The wrong abstraction](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction), [Making illegal states unrepresentable](https://fsharpforfunandprofit.com/posts/designing-with-types-making-illegal-states-unrepresentable/), [Primitive obsession](https://refactoring.guru/smells/primitive-obsession), [Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/).
 
-- **Make illegal states unrepresentable.** Design types so a value that breaks a business rule can't be constructed at all, instead of checking for it in every function that receives one. The tell is a type whose fields are only valid in certain combinations: two nullable fields where "at least one must be set", a `Status` enum plus fields that only mean something for one status, a `bool` that decides which other fields are filled in. Every consumer then has to remember the rule, and one eventually won't. Model each valid combination as its own case instead:
+## Code that reads straight through
+
+- **A function names a sequence of steps, and its name has to earn the jump.** A helper called from one place usually costs more than it saves: the reader has to look it up to learn what the caller does. Inline it, and let sequential work read top to bottom in one longer function. Keep a helper when its name tells the reader something the code doesn't, when it isolates an invariant, or when inlining would bury the caller in nesting.
+- **Shared code must stay simple for every caller.** Merging call sites is worth it while the shared path reads the same for all of them. When it starts growing a parameter per caller, plus a conditional to act on each one, it has become the wrong abstraction. The test: a parameter that every caller passes the same value for, or that only ever picks one branch, shouldn't exist. Inline the abstraction back into its callers, delete what each one doesn't use, and pull out only what is still genuinely shared. Duplication is cheaper than an abstraction everything has to bend around, and the effort already spent on it is no reason to keep it.
+
+## Types that carry the rules
+
+A rule that lives in a type is checked once, by the compiler. A rule that lives in callers is checked by each caller, and one of them eventually won't. The default for new data is a type that can only hold valid values.
+
+- **A field accepts only what the domain accepts.** When you add a field or parameter, ask whether every value its primitive can hold is valid. For a `string`, that includes `""`, whitespace, a 1 MB blob, control characters, and the full text of *Moby Dick*. For an `int`, that includes `0`, negatives, and `int.MaxValue`. For a `Guid`, that includes the id of a different entity. If any of those must be rejected (because of a format, a length, a character set, a range, or what the value refers to), the field is not that primitive. Make it a newtype with `Parse`/`TryParse`, shaped like `Auth0Id`. Emails, slugs, country codes, amounts with a currency, and entity ids are all their own types. Unlike a single-use function, a single-use type is still worth having. A function only names steps, but a type carries its rule everywhere the value goes.
+- **Valid combinations are their own cases.** When fields are only valid together in certain combinations, every consumer has to know the rule. Examples: two nullable fields where at least one must be set, a `Status` enum plus fields that only mean something for one status, or a `bool` that decides which other fields are filled in. Model each valid combination as a case of a closed hierarchy instead:
 
   ```csharp
   // "A contact needs an email, a postal address, or both" — but nothing stops both being null.
@@ -91,44 +99,38 @@ Source: https://fsharpforfunandprofit.com/posts/designing-with-types-making-ille
   public record Contact(string Name, ContactInfo ContactInfo);
   ```
 
-  C# has no closed unions yet, so a `switch` over `ContactInfo` still needs a `_ => throw new UnreachableException(...)` arm and adding a case isn't a compile error at the call sites. The private constructor and the type's own definition are still where the rule lives, which beats it living in every caller. Smaller versions of the same idea are a strongly typed id instead of a `Guid`, a parsed type instead of a validated `string` (see Parsing), and a non-nullable property instead of a nullable one plus a comment. When the compiler can't carry the rule, fall back to an architecture test, as described in "Making invalid states impossible" below.
+  C# has no closed unions yet, so a `switch` over `ContactInfo` still needs a `_ => throw new UnreachableException(...)` arm, and adding a case doesn't cause compile errors at the call sites. The rule still lives in one definition instead of in every caller.
+- **A value says what it means at the call site.** `Export(report, true)` tells the reader nothing. First, ask whether the flag should exist at all. If it only picks one branch, it is often two functions joined together (see above). If it should exist, use a two-value enum: `Export(report, Compression.Enabled)`. This also leaves room for a third case. Named arguments don't solve it, because callers can leave the name out. If the flag decides which other fields are set, use cases (above), not an enum. A `bool` is fine when the member's name already says what it means, such as `IsActive` or the result of `TryParse`. If an enum crosses the API boundary, read the enum parsing section in `README.md` first.
+- **Model the domain, not today's caller.** If a type only has a flag or an `int?` because one function needed it, change the type to match what the domain actually is.
+
+### Parsing at the boundary
+
+The worked examples live in `README.md`. Read that section before writing anything that takes external input. `Shared.Domain/Auth0Id.cs` is the reference implementation: `IParsedString<T>` (an `IParsable<T>` that also declares its OpenAPI `Pattern` and `Example`, picked up by `ParsedStringSchemaFilter`) and a `JsonConverter` for request bodies. Copy its shape.
+
+- **Parse, don't validate.** A parser turns loose input into a type that records what it checked. A validator checks the input and then throws that knowledge away, so every caller has to check again.
+- **Parse once, at the entry point.** That entry point may be the framework's own hook, such as `IParsable<T>` binding or a `JsonConverter` for `[FromBody]`. Code past the entry point assumes the input is valid and doesn't parse again.
+- **Never act on partially-valid input.** All failures happen during parsing, before any work starts.
+- **Keep the published schema honest.** A parsed type must still be documented as the `string`/`integer` it is on the wire, or every generated client changes. Don't guess what Swashbuckle will do; check it. See `RespectRequiredConstructorParameters` and the enum converter in `DefaultOptions` (`Shared.Host/HostBuilder.cs`), and the tests in `Shared.Host.Test/ResponseModelTest.cs`.
+
+## State and effects you can see
+
+- **Computation takes inputs and returns a value.** Pass in the one or two pieces of state it needs instead of reading or mutating global or ambient state, even if that means more parameters. Getting from tangled state to mostly pure is a big win. Getting from mostly pure to fully pure is a small one.
+- **Side effects happen in one place.** Prefer always running the operation and then ignoring or discarding the result over running it conditionally from scattered places. Fewer branches mean fewer surprises about state. This rule is about where effects happen. The logic that decides them should still be pure.
+- **Value-like data is returned as a copy, not mutated.** Mutable state behind a shared reference is what makes a `record`'s generated `Equals` lie (`docs/RECORDS.md`). Mutating something you own privately, where the domain really is mutable, is fine.
 
 # Comments
 
 - **A comment earns its place only by explaining a why the code cannot show.** Never restate what the code says. Keep a comment only when something invisible forces a non-obvious choice: a library or protocol constraint, a domain rule, a deliberate trade-off, or an invariant the types can't carry. When you *do* need to say "this can't happen", say it and say why — a bare `throw` with no explanation is worse than none.
 - **Never narrate the change in the source.** Explanations of why the code changed belong in the commit message or PR. A reader six months out has no "before", so the contrast resolves to nothing.
 
-# The wrong abstraction
-
-Source: https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction
-
-- **Duplication is far cheaper than the wrong abstraction.** This is what reconciles Metz with Carmack's "inline single-use helpers" and "collapse call sites". Carmack asks you not to build a tree of tiny helpers _or_ to merge every call site into one flagged path; Metz asks you not to build one god-helper that everything bends to fit. Both push toward code that reads straight through.
-- **Warning signs:** you are adding another parameter to a shared function, and then another conditional inside it to decide what to do with that parameter. It was right when written; it no longer is.
-- **When you see those signs, go back.** Inline the abstraction into its callers, let each keep only the subset it uses, delete the rest, then re-isolate the duplication that is genuinely shared and re-extract a correct abstraction. Often the callers were running fairly unique code all along.
-- **Don't be trapped by the sunk cost fallacy.** Complex and hard to understand is a signal to delete, not an asset to preserve.
-- **Practical test:** if every call site passes the same value for a new parameter, or the parameter only ever selects one branch, the abstraction is wrong — drop the parameter, or inline the abstraction.
-
-# Parsing
-
-The worked examples live in `README.md` — read that section before writing anything that takes external input. `Shared.Domain/Auth0Id.cs` is the reference implementation of a parsed type: `IParsedString<T>` (an `IParsable<T>` that also declares its OpenAPI `Pattern` and `Example`, picked up by `ParsedStringSchemaFilter`) and a `JsonConverter` for bodies. Copy its shape for new ones. The general principle, which the README assumes rather than restates:
-
-- **Avoid primitive obsession** (https://refactoring.guru/smells/primitive-obsession). When you add a field or parameter, your first move should be to ask whether it really is a `string`, `int`, or `Guid`. The test: **is every value the primitive can hold a valid value for this field?** For a `string`, that includes `""`, whitespace, a 1 MB blob, control characters, and the full text of *Moby Dick*. For an `int`, that includes `0`, negatives, and `int.MaxValue`. For a `Guid`, that includes the id of a different entity. If any of those must be rejected, because the value has a format, a length, a character set, a range, or a meaning, then the field has a narrower domain than its primitive. Make it a newtype that uses the `Parse`/`TryParse` pattern, shaped like `Auth0Id`. An email, a slug, a country code, an amount with a currency, or an id that mustn't be mixed up with another id are all their own types. Use a bare primitive only when every value of it really is valid. "It's only used in one place" doesn't count as a reason, because one place is where it starts.
-  `bool` fails a different way. Every value is valid, but the value doesn't say what it means: `Export(report, true)` tells the reader nothing. Use a two-value enum instead (`Export(report, Compression.Enabled)`), which also leaves room for a third case later. This works the same way as passing `{ compress: true }` in JavaScript. Named arguments (`compress: true`) don't fix it, because callers can leave them out. A `bool` is fine when the name of the member already carries the meaning, such as an `IsActive` property or a `TryParse` result. If an enum crosses the API boundary, read the enum parsing section in `README.md` first.
-- **Parse, don't validate.** A parser takes less-structured input and hands back more-structured output, preserving in its return type what it learned. A validator throws that knowledge away and makes every caller re-derive it.
-- **Push the burden of proof up to the boundary, but no further.** Parse once at the entry point, then let the interior assume validity. That boundary may be the framework's own hook — `IParsable<T>` binding, a `JsonConverter` for `[FromBody]` — which is still the entrypoint. Don't parse below it.
-- **Never act on partially-valid input.** Split work into a parse phase where all failures happen, then an execution phase.
-- **Keep the published schema honest.** A refined input type still has to be documented as the `string`/`integer` it is on the wire, or every generated client churns. Don't guess what Swashbuckle will do — check it. This repo leans on `RespectRequiredConstructorParameters` and the enum converter for exactly this; see `DefaultOptions` in `Shared.Host/HostBuilder.cs` and the tests in `Shared.Host.Test/ResponseModelTest.cs`.
-- **Don't let the types be driven by today's function.** If the representation only has a flag or an `int?` because one caller needed it, change the representation to what the domain actually is.
-- **These are ideals, not hard requirements.** Capturing every invariant in the type system isn't always practical. Leave a guard in place when you must, but comment the invariant so the next person knows it's deliberate rather than forgotten. If the invariant is about the shape of the code rather than a runtime value, an architecture test is usually a better fallback than a guard — see below.
-
-# Making invalid states impossible
+# Enforcing the rules
 
 Enforce a rule at the earliest point that can catch it, in this order:
 
-1. **The type system.** Make the invalid state unrepresentable so breaking the rule is a compiler error: a strongly typed id instead of a `Guid`, a record with no public setters instead of a mutable class, `Results<...>` instead of `IActionResult`, a parsed type instead of a validated `string`. This is always the first choice — it costs nothing at runtime and the feedback is immediate. See "Make illegal states unrepresentable" under Coding style.
+1. **The type system.** Breaking the rule is a compiler error. Examples: a strongly typed id, a record with no public setters, `Results<...>` instead of `IActionResult`, a parsed type instead of a validated `string`. This is always the first choice. See "Types that carry the rules" above.
 2. **An analyzer or banned symbol.** When the rule is "never call X", `BannedSymbols.txt` or an existing analyzer turns it into a build error.
 3. **An architecture test.** When the rule spans types and the compiler can't express it — "every id lives in this namespace and has a private `Guid` constructor", "domain types have no public setters", "every endpoint declares its authorization" — add a reflection-based test to `Shared.Host.Test/ArchitectureTest.cs`. A convention that only lives in a README or in review comments will eventually be broken; a test that names the offending type won't let it.
-4. **A runtime guard**, only when none of the above can reach it, with a comment stating the invariant.
+4. **A runtime guard**, only when none of the above can reach it, with a comment stating the invariant so the next person knows it's deliberate.
 
 When writing an architecture test:
 
