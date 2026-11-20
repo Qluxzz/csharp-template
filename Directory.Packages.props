@@ -8,12 +8,6 @@
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="18.12.1" />
     <PackageVersion Include="Nullable.Extended.Analyzer" Version="1.19.0" />
     <PackageVersion Include="Tetractic.CodeAnalysis.ExceptionAnalyzers" Version="1.5.0" />
-    <!--
-      Shared.Domain.Generators. Must not be newer than the compiler in the SDK pinned by
-      global.json, or the generator fails to load. SDK 10.0.1xx ships Roslyn 5.0.
-    -->
-    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <!-- Shared.Host -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.15" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />

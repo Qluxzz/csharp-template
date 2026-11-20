@@ -1,8 +1,11 @@
 ﻿using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.OpenApi;
+using Shared.Domain;
 using Shared.Host.TypedIds;
 
 namespace Shared.Host.Swagger;
@@ -27,10 +30,17 @@ public static class Extensions
             // This filter makes the OpenAPI schema report them as that string instead of an object.
             options.SchemaFilter<StronglyTypedIdSchemaFilter>();
 
-            // Parsed types travel as strings but are classes in C#, without this
-            // Swashbuckle documents them as an empty object.
-            options.SchemaFilter<ParsedStringSchemaFilter>();
-            options.ParameterFilter<ParsedStringSchemaFilter>();
+            // Auth0Id is a class with no public properties, so Swashbuckle would publish it as an
+            // empty object, but on the wire it is a string.
+            options.MapType<Auth0Id>(() =>
+                new OpenApiSchema
+                {
+                    Type = JsonSchemaType.String,
+                    Pattern = Auth0Id.Pattern,
+                    Examples = [JsonValue.Create(Auth0Id.Example)],
+                }
+            );
+            options.ParameterFilter<Auth0IdParameterFilter>();
 
             if (custom is not null)
                 custom(options);

@@ -18,7 +18,6 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,12 +27,5 @@
   <ItemGroup>
     <ProjectReference Include="..\Shared.Domain\Shared.Domain.csproj" />
     <ProjectReference Include="..\Shared.Host\Shared.Host.csproj" />
-    <!-- As an analyzer for the [ParsedString] types declared in tests, and as an assembly so
-         ParsedStringGeneratorTest can run it against code that should fail to compile -->
-    <ProjectReference
-      Include="..\Shared.Domain.Generators\Shared.Domain.Generators.csproj"
-      OutputItemType="Analyzer"
-      ReferenceOutputAssembly="true"
-    />
   </ItemGroup>
 </Project>

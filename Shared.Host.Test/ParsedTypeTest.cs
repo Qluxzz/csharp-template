@@ -52,6 +52,8 @@ public class ParsedTypeTest
     [InlineData("507f1f77bcf86cd799439011")]
     [InlineData("google-oauth2|507f1f77bcf86cd799439011")]
     [InlineData("auth0|")]
+    [InlineData("auth0|507f1f77bcf86cd799439011\n")]
+    [InlineData("auth0|507f\n1f77bcf86cd799439011")]
     public async Task InvalidRouteValueIsRejectedBeforeTheHandlerRuns(string id)
     {
         var cancellationToken = TestContext.Current.CancellationToken;

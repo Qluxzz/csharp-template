@@ -74,25 +74,6 @@ public class ArchitectureTest
     }
 
     [Fact]
-    public void ParsedDomainTypesDescribeTheirOpenApiSchema()
-    {
-        // ParsedStringSchemaFilter only documents types implementing IParsedString<T>; any other
-        // parsed type shows up in Swagger as an empty object. Strongly typed ids are parsable too,
-        // but StronglyTypedIdSchemaFilter documents them.
-        var violations = ParsedTypes()
-            .Except(StronglyTypedIds())
-            .Where(t =>
-                !t.GetInterfaces()
-                    .Any(i =>
-                        i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IParsedString<>)
-                    )
-            )
-            .Select(t => t.FullName);
-
-        Assert.Empty(violations);
-    }
-
-    [Fact]
     public void DomainTypesHaveNoPublicSetters()
     {
         // See "Public Setters considered harmful" in README.md. `init` is allowed since it can

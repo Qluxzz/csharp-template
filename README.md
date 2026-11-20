@@ -77,29 +77,10 @@ What if we only could have this obfuscation enabled in production, but not in de
 With a [custom exception handler](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0#exception-handler-lambda) we can do just that. So now your controller method looks like this:
 
 ```csharp
-public async Task MyEndpoint()
+public async Task<Ok<MyResult>> MyEndpoint()
 {
     var result = await DoSomething();
-    return Ok(result);
-}
-```
-
-And in your Program.cs file you instead have this:
-
-```csharp
-if (app.Environment.IsProduction())
-{
-    // Catch all unhandled exceptions and just return a non descriptive "Internal Server Error" message
-    app.UseExceptionHandler(exceptionHandlerApp =>
-    {
-        exceptionHandlerApp.Run(async context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            context.Response.ContentType = Text.Plain;
-
-            await context.Response.WriteAsync("Internal Server Error");
-        });
-    });
+    return TypedResults.Ok(result);
 }
 ```
 
@@ -175,7 +156,7 @@ public record Foo(int Bar, int Baz);
 
 https://gist.github.com/Qluxzz/706043bc37d0d1030e1cd9d3841918f5
 
-### Custom types with validation and Swagger representation
+### Custom parsed types
 
 Sometimes you have an identifier or something similar that you want to validate before continuing further into the application ([Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)). You also want it to be easy for the consumers of your API, so they send a plain string and the backend works with a custom type.
 
@@ -183,32 +164,12 @@ Since .NET 7 this is possible with [static abstract interface members](https://l
 
 As an example, Auth0 user ids have a specific format: they start with `auth0|` followed by the id. Wouldn't it be nice if the model binder validated that for us, so that once we're inside the endpoint we _know_ we have a valid Auth0 id?
 
-The full working version is [`Shared.Domain/Auth0Id.cs`](Shared.Domain/Auth0Id.cs), and it's tested end to end in [`Shared.Host.Test/ParsedTypeTest.cs`](Shared.Host.Test/ParsedTypeTest.cs). All you write is the rule:
+The full working version is [`Shared.Domain/Auth0Id.cs`](Shared.Domain/Auth0Id.cs), and it's tested end to end in [`Shared.Host.Test/ParsedTypeTest.cs`](Shared.Host.Test/ParsedTypeTest.cs). It has two pieces:
 
-```csharp
-[ParsedString(@"^auth0\|.+$", "auth0|507f1f77bcf86cd799439011")]
-public sealed partial record Auth0Id
-{
-    private const string _prefix = "auth0|";
+1. **`IParsable<T>`** with a private constructor, so the only way to get an `Auth0Id` is through `Parse`/`TryParse`. Route and query parameters bind through it, and a value that fails to parse returns `400 Bad Request` before your endpoint runs.
+2. **A `JsonConverter`** for request and response bodies, including dictionary keys. System.Text.Json ignores `IParsable<T>`, so without a converter a `[FromBody]` field would not be parsed. The converter throws `JsonException` on invalid input, since that's what the model binder turns into a 400; [any other exception becomes a 500](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/converters-how-to#when-to-throw-which-exception-type). Error messages describe the expected format, never the rejected value, since that might be a token or other secret.
 
-    private static Auth0Id? TryParse(string value) =>
-        value.StartsWith(_prefix, StringComparison.Ordinal) && value.Length > _prefix.Length
-            ? new Auth0Id(value)
-            : null;
-}
-```
-
-`TryParse` returns `null` for invalid input. It can also normalize the value before constructing it, for example trimming and lowercasing an email, so every instance is stored in the same form. It never receives `null`: that's rejected before it's called.
-
-The source generator in [`Shared.Domain.Generators`](Shared.Domain.Generators/ParsedStringGenerator.cs) adds the rest, which is three pieces:
-
-1. **`IParsable<T>`** with a private constructor, so the only way to get an `Auth0Id` is through `Parse`/`TryParse`. Unlike libraries that keep a public constructor and only warn about using it, the constructor really is private. Route and query parameters bind through it, and a value that fails to parse returns `400 Bad Request` before your endpoint runs.
-2. **A `JsonConverter`** (the shared `ParsedStringJsonConverter<T>`) for request and response bodies, including dictionary keys. System.Text.Json ignores `IParsable<T>`, so without a converter a `[FromBody]` field would not be parsed. The converter throws `JsonException` on invalid input, since that's what the model binder turns into a 400; [any other exception becomes a 500](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/converters-how-to#when-to-throw-which-exception-type).
-3. **`IParsedString<T>`** instead of `IParsable<T>` directly, so the type owns its Swagger representation. To Swashbuckle the type is a class and would be documented as an empty object. The `Pattern` and `Example` from the attribute become static members, and `ParsedStringSchemaFilter` in [`Shared.Host/Swagger`](Shared.Host/Swagger/ParsedStringSchemaFilter.cs) documents every type implementing `IParsedString<T>` as a string with that pattern and example, in bodies as well as route and query parameters. Nothing has to be registered per type, and `Shared.Domain` doesn't have to reference OpenAPI.
-
-Parse errors read `Auth0Id should look like "auth0|507f1f77bcf86cd799439011"`. They show the example, never the rejected value, since that might be a token or other secret.
-
-A type with the wrong shape doesn't compile: it must be a `sealed partial record`, declare exactly that `TryParse`, declare no constructor of its own, and pass a non-empty pattern and example (`PS0001`–`PS0004`). The generated code is written to `obj/generated` if you want to read it.
+`TryParse` may normalize input, but only when the domain defines the spellings as equivalent (for example, case-insensitive country codes).
 
 This also works together with `[Required]` and nullable modifiers. Your endpoint then looks like this:
 
@@ -257,8 +218,10 @@ These two methods however have a big downside, which is debuggability. When .Sin
 It's always better to use the following pattern:
 
 ```csharp
-var singleItem = obj.With.Deeply.Nested.List.SingleOrDefault() ?? throw new UnreachableException($"We always expected this list to contain a single element, here's the entire object so you can debug it and discuss if this should be possible or if it's the cause of a deeper problem. Data: {JsonSerializer.Serialize(obj)}");
+var singleItem = order.Lines.SingleOrDefault() ?? throw new UnreachableException($"Expected order {order.Id} to have exactly one line, but it had {order.Lines.Count}.");
 ```
+
+Say which invariant broke and include the fields that identify the object, but don't serialize the whole object: it may contain tokens, personal data or other secrets that then end up in logs.
 
 ## System.Text.Json.JsonSerializer.DeserializeAsync can return null, and doesn't validate that our defined fields were included in the json payload
 
@@ -328,13 +291,14 @@ Just be mindful of ASP.NET Identity and other libraries that override this behav
 
 [Type-safe IDs](#type-safe-ids) travel over the wire as prefixed strings, but in the database you want the `Guid` they wrap stored in a real `uuid` column — not an `example_...` string. EF Core doesn't know how to map a `UserId` struct on its own, and registering a `ValueConverter` for every id by hand gets old fast.
 
-Because every id lives in the single `Shared.Domain` namespace, and the template gives each one a private `Value` property and a private `Guid` constructor, you can register one `ValueConverterSelector` that converts _every_ id in that namespace to its backing `Guid`. Add a new id and it's covered automatically, no per-id registration:
+Because every id is marked with `[StronglyTypedId]`, and the template gives each one a private `Value` property and a private `Guid` constructor, you can register one `ValueConverterSelector` that converts _every_ id to its backing `Guid`. It selects on the attribute rather than the namespace, since other parsed types such as `Auth0Id` live in `Shared.Domain` too. Add a new id and it's covered automatically, no per-id registration:
 
 ```csharp
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Shared.Domain;
+using StronglyTypedIds;
 
 namespace Shared.Database;
 
@@ -346,10 +310,6 @@ public class StronglyTypedIdValueConverterSelector(ValueConverterSelectorDepende
         (Type ModelClrType, Type ProviderClrType),
         ValueConverterInfo
     > _converters = new();
-
-    private readonly string _idModelNameSpace =
-        typeof(ExampleId).Namespace
-        ?? throw new Exception("Expected ExampleId type to have a namespace");
 
     public override IEnumerable<ValueConverterInfo> Select(
         Type modelClrType,
@@ -369,10 +329,7 @@ public class StronglyTypedIdValueConverterSelector(ValueConverterSelectorDepende
         // 'null' means 'get any value converters for the modelClrType'
         if (underlyingProviderType is null || underlyingProviderType == typeof(Guid))
         {
-            var modelNameSpace =
-                underlyingModelType?.Namespace
-                ?? throw new Exception("Underlying model type was null!");
-            if (modelNameSpace == _idModelNameSpace)
+            if (underlyingModelType?.GetCustomAttribute<StronglyTypedIdAttribute>() is not null)
             {
                 yield return _converters.GetOrAdd(
                     (underlyingModelType, typeof(Guid)),
