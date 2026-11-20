@@ -12,10 +12,8 @@ namespace Shared.Domain;
 [JsonConverter(typeof(Auth0IdJsonConverter))]
 public sealed partial record Auth0Id : IParsable<Auth0Id>
 {
-    public const string Prefix = "auth0|";
-
     /// <summary>The format <see cref="TryParse"/> accepts, published in the OpenAPI schema.</summary>
-    public const string Pattern = @"^auth0\|.+$";
+    public const string Pattern = @"^auth0\|[0-9a-f]{24}$";
 
     /// <summary>An example value, published in the OpenAPI schema.</summary>
     public const string Example = "auth0|507f1f77bcf86cd799439011";
@@ -31,7 +29,7 @@ public sealed partial record Auth0Id : IParsable<Auth0Id>
     public static Auth0Id Parse(string s, IFormatProvider? provider = null) =>
         TryParse(s, provider, out var id)
             ? id
-            : throw new FormatException($"Auth0 id should have the format {Prefix}XXXXXXX");
+            : throw new FormatException($"Auth0 id should look like {Example}");
 
     public static bool TryParse(
         [NotNullWhen(true)] string? s,
@@ -78,7 +76,7 @@ public sealed class Auth0IdJsonConverter : JsonConverter<Auth0Id>
     ) =>
         Auth0Id.TryParse(reader.GetString(), null, out var id)
             ? id
-            : throw new JsonException($"Auth0 id should have the format {Auth0Id.Prefix}XXXXXXX");
+            : throw new JsonException($"Auth0 id should look like {Auth0Id.Example}");
 
     public override void Write(
         Utf8JsonWriter writer,

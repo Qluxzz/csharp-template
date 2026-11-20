@@ -52,6 +52,11 @@ public class ParsedTypeTest
     [InlineData("507f1f77bcf86cd799439011")]
     [InlineData("google-oauth2|507f1f77bcf86cd799439011")]
     [InlineData("auth0|")]
+    [InlineData("auth0|507f1f77bcf86cd79943901")]
+    [InlineData("auth0|507f1f77bcf86cd7994390111")]
+    [InlineData("auth0|507F1F77BCF86CD799439011")]
+    [InlineData("auth0|507f1f77bcf86cd79943901g")]
+    [InlineData("auth0|legacy-user-42")]
     [InlineData("auth0|507f1f77bcf86cd799439011\n")]
     [InlineData("auth0|507f\n1f77bcf86cd799439011")]
     public async Task InvalidRouteValueIsRejectedBeforeTheHandlerRuns(string id)
@@ -71,6 +76,13 @@ public class ParsedTypeTest
         Assert.Throws<JsonException>(() =>
             JsonSerializer.Deserialize<UserResponse>("""{"Id":"not-an-auth0-id"}""")
         );
+    }
+
+    [Fact]
+    public void PublishedExampleIsAccepted()
+    {
+        // The example is shown in Swagger and in every format error, so it must match the pattern.
+        Assert.True(Auth0Id.TryParse(Auth0Id.Example, null, out _));
     }
 
     [Fact]

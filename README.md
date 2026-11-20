@@ -162,7 +162,7 @@ Sometimes you have an identifier or something similar that you want to validate 
 
 Since .NET 7 this is possible with [static abstract interface members](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-11.0/static-abstracts-in-interfaces) through [`IParsable<T>`](https://learn.microsoft.com/en-us/dotnet/api/system.iparsable-1), which defines how to turn a string into your type. (Before .NET 7 the same could be done with a [type converter](https://learn.microsoft.com/en-us/dotnet/api/system.componentmodel.typeconverter).)
 
-As an example, Auth0 user ids have a specific format: they start with `auth0|` followed by the id. Wouldn't it be nice if the model binder validated that for us, so that once we're inside the endpoint we _know_ we have a valid Auth0 id?
+As an example, Auth0 user ids have a specific format: the ids Auth0 generates are `auth0|` followed by 24 lowercase hex characters. Wouldn't it be nice if the model binder validated that for us, so that once we're inside the endpoint we _know_ we have a valid Auth0 id?
 
 The full working version is [`Shared.Domain/Auth0Id.cs`](Shared.Domain/Auth0Id.cs), and it's tested end to end in [`Shared.Host.Test/ParsedTypeTest.cs`](Shared.Host.Test/ParsedTypeTest.cs). It has two pieces:
 
