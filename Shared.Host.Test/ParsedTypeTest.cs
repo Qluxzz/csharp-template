@@ -15,7 +15,7 @@ public class ParsedTypeTest
 {
     private static readonly string[] _noArgs = [];
 
-    private const string ValidId = "auth0|507f1f77bcf86cd799439011";
+    private const string _validId = "auth0|507f1f77bcf86cd799439011";
 
     private static async Task<SharedHost> StartHost(CancellationToken cancellationToken)
     {
@@ -43,9 +43,9 @@ public class ParsedTypeTest
         var host = await StartHost(cancellationToken);
 
         var response = await host.GetTestClient()
-            .GetStringAsync($"/users/{Uri.EscapeDataString(ValidId)}", cancellationToken);
+            .GetStringAsync($"/users/{Uri.EscapeDataString(_validId)}", cancellationToken);
 
-        Assert.Equal($$"""{"id":"{{ValidId}}"}""", response);
+        Assert.Equal($$"""{"id":"{{_validId}}"}""", response);
     }
 
     [Theory]
@@ -88,11 +88,11 @@ public class ParsedTypeTest
     [Fact]
     public void CanBeUsedAsADictionaryKey()
     {
-        var id = Auth0Id.Parse(ValidId);
+        var id = Auth0Id.Parse(_validId);
 
         var json = JsonSerializer.Serialize(new Dictionary<Auth0Id, int> { [id] = 1 });
 
-        Assert.Equal($$"""{"{{ValidId}}":1}""", json);
+        Assert.Equal($$"""{"{{_validId}}":1}""", json);
         Assert.Equal(
             new Dictionary<Auth0Id, int> { [id] = 1 },
             JsonSerializer.Deserialize<Dictionary<Auth0Id, int>>(json)

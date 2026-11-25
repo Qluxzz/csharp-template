@@ -29,7 +29,7 @@ public class SharedHostBuilder
 {
     private bool _useSwagger = false;
 
-    private bool _useSignalR { get; set; }
+    private bool _useSignalR = false;
 
     private BearerTokenSettings? _bearerTokenSettings = null;
 

@@ -38,7 +38,7 @@ Packages are centrally versioned in `Directory.Packages.props`. Never put a `Ver
 - **Follow what's there.** Match the established patterns unless the task is specifically to change them.
 - **Make the smallest coherent change.** Unrelated cleanup buries the actual diff and makes review harder. If you spot something worth fixing elsewhere, mention it rather than folding it in.
 - **Test changed behaviour.** Extend the existing test project (`Shared.Host.Test`) alongside a change rather than leaving it unverified, including the failure cases your change introduces.
-- **When sources disagree,** enforced configuration (`Directory.Build.props`, `BannedSymbols.txt`) wins for anything that fails the build. For advisory conventions, explicit guidance here wins over `.editorconfig` — see the static-field note below for the current example.
+- **When sources disagree,** enforced configuration (`Directory.Build.props`, `BannedSymbols.txt`) wins for anything that fails the build.
 - **Report what you didn't run.** If a check couldn't be run, say so explicitly instead of implying the work is verified.
 
 # What the build enforces
@@ -56,7 +56,7 @@ These are compiler errors here, not preferences. `TreatWarningsAsErrors` is on a
 
 - File-scoped namespaces; `using` outside the namespace.
 - Primary constructors where a class just wraps a single dependency (`public SharedHost(WebApplication webApplication)`).
-- Private fields are `_camelCase`. Private **static readonly** fields are also `_camelCase` in this repo (see the two declared near the bottom of `SharedHostBuilder` in `Shared.Host/HostBuilder.cs`) even though `.editorconfig` still says PascalCase for that group — follow the code.
+- Private fields and constants are `_camelCase`, including `static readonly` fields.
 - Records over classes for anything that is just data. No public setters; see `README.md` for why.
 - Swagger publishes the XML comments on public API, so a `<summary>` becomes user-facing docs. `CS1591` is suppressed, so a missing summary doesn't fail the build; write one where it tells an API consumer something the name doesn't.
 - Return expected failures as values (`TypedResults`/`Results<...>` in controllers), not exceptions.
