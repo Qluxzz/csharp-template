@@ -11,7 +11,7 @@ dotnet tool run csharpier check .        # CI formatting gate
 dotnet test                              # builds and runs all tests
 ```
 
-`TreatWarningsAsErrors` is on, so `dotnet test` also fails on any analyzer warning. There is no separate `dotnet build` step to run first.
+`dotnet test` builds first and fails on any analyzer warning (see "What the build enforces"), so there is no separate `dotnet build` step.
 
 **Lock files.** `Directory.Build.props` sets both `RestorePackagesWithLockFile` and `RestoreLockedMode`. Adding a package or bumping a version makes restore fail until the lock file is regenerated:
 
@@ -46,10 +46,9 @@ Packages are centrally versioned in `Directory.Packages.props`. Never put a `Ver
 These are compiler errors here, not preferences. `TreatWarningsAsErrors` is on and four analyzer packages are referenced from `Directory.Build.props`.
 
 - **No `!` (null-forgiving operator).** `Nullable.Extended.Analyzer`. If you believe a value can't be null at that point, the type is modelled wrong — fix the type. When a null really is impossible-but-unprovable, the house pattern is `?? throw new UnreachableException(...)`, carrying enough context that the next person can debug it rather than guess — the README's `.SingleOrDefault()` pattern is the reference example. Include the context that identifies *which* invariant broke, and only state you believe is safe to log; don't serialize secrets into an exception message.
-- **Exceptions only for exceptional things, and always documented.** `Tetractic.CodeAnalysis.ExceptionAnalyzers` reports `EXC0100` as an error when a method can throw without an `<exception cref="...">` tag — no configuration needed, it applies to every relevant throwing method. The tag is documentation, not a compiler-enforced catch obligation: C# has no checked exceptions, so what it actually forces is that the next person has to carry the exceptional case forward in their own docs or handle it. See `DefaultOptions` in `Shared.Host/HostBuilder.cs` for the shape. This is also why controllers return `TypedResults`/`Results<...>` rather than catching-and-500-ing inline.
+- **Exceptions a caller can hit are documented.** `Tetractic.CodeAnalysis.ExceptionAnalyzers` reports `Ex0100` as an error when a method can throw without an `<exception cref="...">` tag; see `DefaultOptions` in `Shared.Host/HostBuilder.cs` for the shape. An exception doesn't appear in the signature, so the tag is what makes that exit visible at the call site; C# has no checked exceptions, so the caller still chooses whether to handle it or document it in turn. When the analyzer flags an exception that cannot occur, suppress `Ex0100` around the smallest block and say why in a comment (see `Auth0Id.TryParse` and `StronglyTypedIdSchemaFilter`). The test project suppresses `Ex0100` entirely.
 - **Forward `CancellationToken`** (CA2016) and **observe async results** (`Microsoft.VisualStudio.Threading.Analyzers`; VSTHRD110 needs an explicit pragma on the one legitimate fire-and-forget, in `SharedHost.Dispose`).
 - **Time comes from an injected `TimeProvider`.** `BannedSymbols.txt` bans `DateTime`, `DateTimeOffset.Now`, `DateTimeOffset.UtcNow` and `TimeProvider.System`. The host registers `TimeProvider.System` once; take `TimeProvider` as a dependency and call `GetUtcNow()`. Tests control time by registering their own `TimeProvider` through `customServices` (see `TimeProviderTest`).
-- **`GenerateDocumentationFile` is on.** XML comments on public API are picked up by Swagger, so a `<summary>` you write here becomes user-facing docs.
 
 # Conventions the code follows
 
@@ -59,16 +58,18 @@ These are compiler errors here, not preferences. `TreatWarningsAsErrors` is on a
 - Primary constructors where a class just wraps a single dependency (`public SharedHost(WebApplication webApplication)`).
 - Private fields are `_camelCase`. Private **static readonly** fields are also `_camelCase` in this repo (see the two declared near the bottom of `SharedHostBuilder` in `Shared.Host/HostBuilder.cs`) even though `.editorconfig` still says PascalCase for that group — follow the code.
 - Records over classes for anything that is just data. No public setters; see `README.md` for why.
+- Swagger publishes the XML comments on public API, so a `<summary>` becomes user-facing docs. `CS1591` is suppressed, so a missing summary doesn't fail the build; write one where it tells an API consumer something the name doesn't.
+- Return expected failures as values (`TypedResults`/`Results<...>` in controllers), not exceptions.
 
 # Coding style
 
 Use these three goals to judge design choices. The build requirements above still apply.
 
 1. **A reader can follow the code top to bottom** without jumping between helpers or tracing flags.
-2. **Abstractions are easy to use correctly and hard to misuse.**
+2. **Abstractions are easy to use correctly and hard to misuse.** Callers can do the right thing without remembering a rule the abstraction could carry for them.
 3. **Pure decisions give the same result for the same inputs; clock reads, I/O, and mutation are explicit.**
 
-**Start with the clearest design that meets the requirement.** Add structure when it prevents a plausible mistake or removes a decision that callers would otherwise have to keep getting right. Weigh that benefit against what people now have to construct, convert, or keep in sync. If the extra code only moves the same decision elsewhere, prefer the simpler design.
+When weighing these goals, **start with the clearest design that meets the requirement.** Add structure when it prevents a plausible mistake or removes a decision that callers would otherwise have to keep getting right. Weigh that benefit against what people now have to construct, convert, or keep in sync. If the extra code only moves the same decision elsewhere, prefer the simpler design.
 
 Background reading, not rules: [Carmack on inlined code](https://cbarrete.com/carmack.html), [The wrong abstraction](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction), [How do I make this hard to misuse?](https://ozlabs.org/~rusty/index.cgi/tech/2008-03-30.html), [Making illegal states unrepresentable](https://fsharpforfunandprofit.com/posts/designing-with-types-making-illegal-states-unrepresentable/), [Primitive obsession](https://refactoring.guru/smells/primitive-obsession), [Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/).
 
@@ -86,8 +87,6 @@ The question to ask of any abstraction, whether a type, method or endpoint, is: 
 3. Misuse fails immediately and loudly, at the boundary.
 
 If callers have to read the docs or the implementation to avoid a likely mistake, or an easy mistake silently produces a wrong result, look for a clearer shape. Sometimes that means inlining the abstraction back into its callers (see "Shared code must stay simple"). Primitive obsession, unparsed input passed inward and checked piecemeal ("shotgun parsing"), and flag arguments are common sources of such mistakes.
-
-The `<exception>` tags the build requires (see "What the build enforces") are not documentation the caller must go and read. An exception leaves the normal control flow and doesn't appear in the method signature, so without the tag a caller can only discover it by reading the implementation. The tag makes that hidden exit visible where the method is called, the same way a strong type makes a hidden rule visible.
 
 A type can carry a rule beyond the place where it's checked. A parser checks a value at runtime; the compiler then distinguishes the parsed type from the unchecked primitive.
 
@@ -114,23 +113,23 @@ A type can carry a rule beyond the place where it's checked. A parser checks a v
 - **A value says what it means at the call site.** `Export(report, true)` tells the reader nothing. First, ask whether the flag should exist at all. If it only picks one branch, it is often two functions joined together (see above). A named argument can clarify one call. If the choice needs to be clear even when callers omit the argument name, use a two-value enum: `Export(report, Compression.Enabled)`. This also leaves room for a third case. If the flag decides which other fields are set, use cases (above), not an enum. A `bool` is fine when the member's name already says what it means, such as `IsActive` or the result of `TryParse`. If an enum crosses the API boundary, read the enum parsing section in `README.md` first.
 - **No "remember to".** Put required inputs in the constructor and steps that must happen together in one method. Make the default or zero value valid or choose a representation that rules it out.
 
-  Two `AccountId` parameters reject an `OrderId`, not a reversed transfer. For one call, `Transfer(from: payerId, to: payeeId)` makes the direction visible. Wrapping those same ids as `SourceAccountId` and `DestinationAccountId` just before the call moves the possible swap into the constructors. Those types can help when debit authorization establishes the source and a payment instruction supplies the destination: later steps can preserve the roles without assigning them again.
+  Distinct id types catch an `OrderId` passed as an `AccountId`, not two `AccountId`s swapped. Named arguments (`Transfer(from: payerId, to: payeeId)`) make the direction visible; role types such as `SourceAccountId` help when they preserve a direction already established earlier. Wrapping two ids just before the call does neither better.
 
 - **Model the domain, not today's caller.** If a type only has a flag or an `int?` because one function needed it, change the type to match what the domain actually is.
 
 ### Parsing at the boundary
 
-The recipe for a parsed type lives in the "Custom parsed types" section of `README.md`, and `Shared.Domain/Auth0Id.cs` is the reference implementation. Read both before writing anything that takes external input, and copy that shape rather than a description of it here. A type needs a `JsonConverter` only if it crosses JSON; one that only comes from configuration or route values does not.
+The recipe for a parsed type lives in the "Custom parsed types" section of `README.md`, and `Shared.Domain/Auth0Id.cs` is the reference implementation. Read both before writing anything that takes external input, and copy that shape rather than a description of it here.
 
 - **Parse external input once, at the edge.** Turn the whole input into domain types or reject it with an explicit error before acting on any of it. Pass the typed values inward so callers don't repeat format, length or range checks. A well-formed order can still fail if an item is out of stock.
 
-  Edges include HTTP requests, SignalR hub arguments, queue messages, external API responses, database rows, configuration, files and CLI arguments. For HTTP, use `IParsable<T>` model binding for route values or a `JsonConverter` for a parsed type in a `[FromBody]` payload.
+  Edges include HTTP requests, SignalR hub arguments, queue messages, external API responses, database rows, configuration, files and CLI arguments. For HTTP, use `IParsable<T>` model binding for route values or a `JsonConverter` for a parsed type in a `[FromBody]` payload. A type needs a `JsonConverter` only if it crosses JSON.
 
 - **Keep the published schema honest.** A parsed type must still be documented as the `string`/`integer` it is on the wire, or every generated client changes. Don't guess what Swashbuckle will do; check it. See `MapType<Auth0Id>` and `Auth0IdParameterFilter` in `Shared.Host/Swagger/` (route values bound through `TryParse` need the filter too), `RespectRequiredConstructorParameters` and the enum converter in `DefaultOptions` (`Shared.Host/HostBuilder.cs`), and the tests in `Shared.Host.Test/ResponseModelTest.cs` and `IsDocumentedAsAStringInSwagger` in `Shared.Host.Test/ParsedTypeTest.cs`.
 
 ## State and effects you can see
 
-- **Computation takes inputs and returns a value.** Pass in the one or two pieces of state it needs instead of reading or mutating global or ambient state, even if that means more parameters. Getting from tangled state to mostly pure is a big win. Getting from mostly pure to fully pure is a small one.
+- **Computation takes inputs and returns a value.** Pass in the one or two pieces of state it needs instead of reading or mutating global or ambient state, even if that means more parameters. For time, read `GetUtcNow()` from the injected `TimeProvider` where the operation runs and pass the result into decisions such as `IsExpired(expiresAt, now)`. Getting from tangled state to mostly pure is a big win. Getting from mostly pure to fully pure is a small one.
 - **Side effects happen in one place.** Decide with pure logic, then perform the effect in a single place, rather than running it conditionally from scattered places. Fewer places that act mean fewer surprises about state.
 - **Value-like data is returned as a copy, not mutated.** Mutable state behind a shared reference is what makes a `record`'s generated `Equals` lie (`docs/RECORDS.md`). Mutating something you own privately, where the domain really is mutable, is fine.
 
