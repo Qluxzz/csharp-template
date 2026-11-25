@@ -67,17 +67,27 @@ These are compiler errors here, not preferences. `TreatWarningsAsErrors` is on a
 The guide has three goals. Each rule below serves one of them. When a rule seems to argue against a goal in a specific case, follow the goal.
 
 1. **A reader can follow the code top to bottom** without jumping between helpers or tracing flags.
-2. **The types carry the rules**, so a value that breaks a business rule can't be constructed, and no caller has to remember the rule.
+2. **Abstractions are easy to use correctly and hard to misuse.** Whether it is a type, a method or an endpoint, the abstraction carries its own rules, so no caller has to remember them: a value that breaks a business rule can't be constructed, a method can't be called in the wrong order or with its arguments swapped, and an endpoint rejects bad input at the boundary. An abstraction that fails this test is worse than none, because it hides the rule instead of showing it.
 3. **State and side effects stay where you can see them**, so the same input gives the same result.
 
-Background reading, not rules: [Carmack on inlined code](https://cbarrete.com/carmack.html), [The wrong abstraction](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction), [Making illegal states unrepresentable](https://fsharpforfunandprofit.com/posts/designing-with-types-making-illegal-states-unrepresentable/), [Primitive obsession](https://refactoring.guru/smells/primitive-obsession), [Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/).
+Background reading, not rules: [Carmack on inlined code](https://cbarrete.com/carmack.html), [The wrong abstraction](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction), [How do I make this hard to misuse?](https://ozlabs.org/~rusty/index.cgi/tech/2008-03-30.html), [Making illegal states unrepresentable](https://fsharpforfunandprofit.com/posts/designing-with-types-making-illegal-states-unrepresentable/), [Primitive obsession](https://refactoring.guru/smells/primitive-obsession), [Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/).
 
 ## Code that reads straight through
 
 - **A function names a sequence of steps, and its name has to earn the jump.** A helper called from one place usually costs more than it saves: the reader has to look it up to learn what the caller does. Inline it, and let sequential work read top to bottom in one longer function. Keep a helper when its name tells the reader something the code doesn't, when it isolates an invariant, or when inlining would bury the caller in nesting.
 - **Shared code must stay simple for every caller.** Merging call sites is worth it while the shared path reads the same for all of them. When it starts growing a parameter per caller, plus a conditional to act on each one, it has become the wrong abstraction. The test: a parameter that every caller passes the same value for, or that only ever picks one branch, shouldn't exist. Inline the abstraction back into its callers, delete what each one doesn't use, and pull out only what is still genuinely shared. Duplication is cheaper than an abstraction everything has to bend around, and the effort already spent on it is no reason to keep it.
 
-## Types that carry the rules
+## Abstractions that carry the rules
+
+The question to ask of any abstraction, whether a type, method or endpoint, is: *what does a caller have to know to use this correctly, and what happens if they don't?* Aim as high as the case allows (condensed from Rusty Russell's hard-to-misuse scale, linked above):
+
+1. Misuse is impossible: it doesn't compile.
+2. The obvious way to use it is the right way.
+3. Misuse fails immediately and loudly, at the boundary.
+
+If correct use depends on the caller reading the docs or the implementation, or misuse silently produces a wrong result, the abstraction is wrong. Fix its shape, or inline it back into its callers (see "Shared code must stay simple"). Primitive obsession, unparsed input passed inward and checked piecemeal ("shotgun parsing"), and flag arguments are the usual ways an abstraction ends up there.
+
+The `<exception>` tags the build requires (see "What the build enforces") are not documentation the caller must go and read. An exception leaves the normal control flow and doesn't appear in the method signature, so without the tag a caller can only discover it by reading the implementation. The tag makes that hidden exit visible where the method is called, the same way a strong type makes a hidden rule visible.
 
 A rule that lives in a type is checked once, by the compiler. A rule that lives in callers is checked by each caller, and one of them eventually won't. The default for new data is a type that can only hold valid values: make impossible states impossible. Every state the model can't represent is a bug that can't happen and a check nobody has to write.
 
@@ -102,6 +112,7 @@ A rule that lives in a type is checked once, by the compiler. A rule that lives 
   This template targets `net10.0` (C# 14), which can't check that a `switch` covers every case. A `switch` over `ContactInfo` therefore still needs a `_ => throw new UnreachableException(...)` arm, and adding a case doesn't cause compile errors at the call sites. The rule still lives in one definition instead of in every caller. C# 15 (.NET 11) adds `closed` hierarchies and `union` types, which make the compiler check that a `switch` covers every case. When the template moves to `net11.0`, mark hierarchies like `ContactInfo` as `closed`, use `union` to combine types you don't own, and drop the discard arms.
 - **Each fact has one owner; everything else is derived.** Storing the same knowledge twice is another way to make an impossible state representable: the copies can disagree. If a value can be computed from other values, compute it rather than storing it. A record holding both `Lines` and `Total`, or a `Status` alongside the fields that determine it, can contradict itself, while a computed `Total` can't. The same applies across artifacts: the C# type owns the API contract, so the OpenAPI document and client types are generated from it, never hand-written. When a fact truly must be written twice, add a test that compares the copies so drift fails the build. This is DRY in its original sense of one authoritative representation per piece of knowledge, not "never write similar-looking code twice". Similar code is covered by "Shared code must stay simple" above.
 - **A value says what it means at the call site.** `Export(report, true)` tells the reader nothing. First, ask whether the flag should exist at all. If it only picks one branch, it is often two functions joined together (see above). If it should exist, use a two-value enum: `Export(report, Compression.Enabled)`. This also leaves room for a third case. Named arguments don't solve it, because callers can leave the name out. If the flag decides which other fields are set, use cases (above), not an enum. A `bool` is fine when the member's name already says what it means, such as `IsActive` or the result of `TryParse`. If an enum crosses the API boundary, read the enum parsing section in `README.md` first.
+- **No "remember to".** If correct use depends on calling things in a certain order, setting a property after construction, passing two same-typed arguments in the right order, or not passing a particular value, the design is relying on the caller's memory. Required inputs go in the constructor, steps that must happen together go in one method, distinct ids get distinct types so `Transfer(from, to)` can't be given an `OrderId`, and the default or zero value of a type is either valid or impossible to construct.
 - **Model the domain, not today's caller.** If a type only has a flag or an `int?` because one function needed it, change the type to match what the domain actually is.
 
 ### Parsing at the boundary
@@ -129,7 +140,7 @@ The recipe for a parsed type lives in the "Custom parsed types" section of `READ
 
 Enforce a rule at the earliest point that can catch it, in this order:
 
-1. **The type system.** Breaking the rule is a compiler error. Examples: a strongly typed id, a record with no public setters, `Results<...>` instead of `IActionResult`, a parsed type instead of a validated `string`. This is always the first choice. See "Types that carry the rules" above.
+1. **The type system.** Breaking the rule is a compiler error. Examples: a strongly typed id, a record with no public setters, `Results<...>` instead of `IActionResult`, a parsed type instead of a validated `string`. This is always the first choice. See "Abstractions that carry the rules" above.
 2. **An analyzer or banned symbol.** When the rule is "never call X", `BannedSymbols.txt` or an existing analyzer turns it into a build error.
 3. **An architecture test.** When the rule spans types and the compiler can't express it — "every id lives in this namespace and has a private `Guid` constructor", "domain types have no public setters", "every endpoint declares its authorization" — add a reflection-based test to `Shared.Host.Test/ArchitectureTest.cs`. A convention that only lives in a README or in review comments will eventually be broken; a test that names the offending type won't let it.
 4. **A runtime guard**, only when none of the above can reach it, with a comment stating the invariant so the next person knows it's deliberate.
