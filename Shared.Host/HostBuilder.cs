@@ -74,6 +74,12 @@ public class SharedHostBuilder
 
         builder.Services.AddRouting();
 
+        // The single place the real clock is wired up; everything else injects TimeProvider so
+        // tests can replace it. customServices runs later, so a registration there wins.
+#pragma warning disable RS0030 // Do not use banned APIs
+        builder.Services.AddSingleton(TimeProvider.System);
+#pragma warning restore RS0030 // Do not use banned APIs
+
         // Only on by default in Development, so a singleton capturing a scoped service
         // would otherwise only surface in production
         builder.Host.UseDefaultServiceProvider(options =>

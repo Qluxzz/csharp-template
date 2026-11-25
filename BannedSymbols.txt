@@ -1,5 +1,7 @@
 # Ban all usage of System.DateTime
-T:System.DateTime; Use DateTimeOffset.UtcNow instead for testability and timezone safety.
+T:System.DateTime; Use DateTimeOffset, read from an injected TimeProvider, for timezone safety and testability.
 
-# Ban DateTimeOffset.Now (local time)
-P:System.DateTimeOffset.Now; Use DateTimeOffset.UtcNow instead to avoid timezone-related bugs.
+# Ban reading the clock directly, so tests can control time by replacing the registered TimeProvider
+P:System.DateTimeOffset.Now; Inject TimeProvider and call GetUtcNow() instead.
+P:System.DateTimeOffset.UtcNow; Inject TimeProvider and call GetUtcNow() instead.
+P:System.TimeProvider.System; Inject TimeProvider instead; the host registers TimeProvider.System once.
