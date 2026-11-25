@@ -2,12 +2,12 @@
 
 # Commands
 
-CSharpier is a local tool (`.config/dotnet-tools.json`), so it is never on `PATH` — always go through `dotnet tool run`.
+CSharpier is a local tool (`.config/dotnet-tools.json`), not a command on `PATH`. Run `dotnet tool restore` once per clone. To fix formatting in place, run `dotnet tool run csharpier format .`.
+
+While iterating, run the narrowest useful tests: a single project or class (for example, `dotnet test --filter-class Shared.Host.Test.ParsedTypeTest`). Before finishing, run both checks from the repo root:
 
 ```bash
-dotnet tool restore                      # required once per clone, before csharpier works
-dotnet tool run csharpier check .        # CI gate — run before you call anything done
-dotnet tool run csharpier format .       # fix formatting in place
+dotnet tool run csharpier check .        # CI formatting gate
 dotnet test                              # builds and runs all tests
 ```
 
@@ -31,8 +31,6 @@ dotnet restore --force-evaluate          # then regenerate the committed lock fi
 `--no-restore` also skips dotnet-outdated's restore preview, so it applies a major version that conflicts with another package without complaint — Swashbuckle 11 needing `Microsoft.OpenApi` 3.x while `Microsoft.AspNetCore.OpenApi` 10 pins `< 3.0.0` is the current example, which is why Swashbuckle is pinned to 10.x in `Directory.Packages.props`. Review the report and run the full `dotnet test` afterwards. A failed upgrade can leave half-written lock files, which surface as `NU1101` rather than the underlying version conflict; fixing the versions and re-running `dotnet restore --force-evaluate` clears that (delete the lock files if it does not).
 
 Packages are centrally versioned in `Directory.Packages.props`. Never put a `Version=` on a `PackageReference`.
-
-While iterating, run the narrowest useful scope — a single test project, or `dotnet test --filter <name>` — and run the full `dotnet test` plus `csharpier check .` before you call the work done.
 
 # How to work in this repo
 
@@ -64,11 +62,13 @@ These are compiler errors here, not preferences. `TreatWarningsAsErrors` is on a
 
 # Coding style
 
-The guide has three goals. Each rule below serves one of them. When a rule seems to argue against a goal in a specific case, follow the goal.
+Use these three goals to judge design choices. The build requirements above still apply.
 
 1. **A reader can follow the code top to bottom** without jumping between helpers or tracing flags.
-2. **Abstractions are easy to use correctly and hard to misuse.** Whether it is a type, a method or an endpoint, the abstraction carries its own rules, so no caller has to remember them: a value that breaks a business rule can't be constructed, a method can't be called in the wrong order or with its arguments swapped, and an endpoint rejects bad input at the boundary. An abstraction that fails this test is worse than none, because it hides the rule instead of showing it.
-3. **State and side effects stay where you can see them**, so the same input gives the same result.
+2. **Abstractions are easy to use correctly and hard to misuse.**
+3. **Pure decisions give the same result for the same inputs; clock reads, I/O, and mutation are explicit.**
+
+**Start with the clearest design that meets the requirement.** Add structure when it prevents a plausible mistake or removes a decision that callers would otherwise have to keep getting right. Weigh that benefit against what people now have to construct, convert, or keep in sync. If the extra code only moves the same decision elsewhere, prefer the simpler design.
 
 Background reading, not rules: [Carmack on inlined code](https://cbarrete.com/carmack.html), [The wrong abstraction](https://sandimetz.com/blog/2016/1/20/the-wrong-abstraction), [How do I make this hard to misuse?](https://ozlabs.org/~rusty/index.cgi/tech/2008-03-30.html), [Making illegal states unrepresentable](https://fsharpforfunandprofit.com/posts/designing-with-types-making-illegal-states-unrepresentable/), [Primitive obsession](https://refactoring.guru/smells/primitive-obsession), [Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/).
 
@@ -79,19 +79,19 @@ Background reading, not rules: [Carmack on inlined code](https://cbarrete.com/ca
 
 ## Abstractions that carry the rules
 
-The question to ask of any abstraction, whether a type, method or endpoint, is: *what does a caller have to know to use this correctly, and what happens if they don't?* Aim as high as the case allows (condensed from Rusty Russell's hard-to-misuse scale, linked above):
+The question to ask of any abstraction, whether a type, method or endpoint, is: *what does a caller have to know to use this correctly, and what happens if they don't?* These guarantees are listed strongest first (condensed from Rusty Russell's hard-to-misuse scale, linked above):
 
 1. Misuse is impossible: it doesn't compile.
 2. The obvious way to use it is the right way.
 3. Misuse fails immediately and loudly, at the boundary.
 
-If correct use depends on the caller reading the docs or the implementation, or misuse silently produces a wrong result, the abstraction is wrong. Fix its shape, or inline it back into its callers (see "Shared code must stay simple"). Primitive obsession, unparsed input passed inward and checked piecemeal ("shotgun parsing"), and flag arguments are the usual ways an abstraction ends up there.
+If callers have to read the docs or the implementation to avoid a likely mistake, or an easy mistake silently produces a wrong result, look for a clearer shape. Sometimes that means inlining the abstraction back into its callers (see "Shared code must stay simple"). Primitive obsession, unparsed input passed inward and checked piecemeal ("shotgun parsing"), and flag arguments are common sources of such mistakes.
 
 The `<exception>` tags the build requires (see "What the build enforces") are not documentation the caller must go and read. An exception leaves the normal control flow and doesn't appear in the method signature, so without the tag a caller can only discover it by reading the implementation. The tag makes that hidden exit visible where the method is called, the same way a strong type makes a hidden rule visible.
 
-A rule that lives in a type is checked once, by the compiler. A rule that lives in callers is checked by each caller, and one of them eventually won't. The default for new data is a type that can only hold valid values: make impossible states impossible. Every state the model can't represent is a bug that can't happen and a check nobody has to write.
+A type can carry a rule beyond the place where it's checked. A parser checks a value at runtime; the compiler then distinguishes the parsed type from the unchecked primitive.
 
-- **A field accepts only what the domain accepts.** When you add a field or parameter, ask whether every value its primitive can hold is valid. For a `string`, that includes `""`, whitespace, a 1 MB blob, control characters, and the full text of *Moby Dick*. For an `int`, that includes `0`, negatives, and `int.MaxValue`. For a `Guid`, that includes the id of a different entity. If any of those must be rejected (because of a format, a length, a character set, a range, or what the value refers to), the field is not that primitive. Make it a newtype with `Parse`/`TryParse`, shaped like `Auth0Id` (see Parsing at the boundary below). Emails, slugs, country codes, amounts with a currency, and entity ids are all their own types. Unlike a single-use function, a single-use type is still worth having. A function only names steps, but a type carries its rule everywhere the value goes.
+- **A field accepts only what the domain accepts.** When you add a field or parameter, ask whether every value its primitive can hold is valid. For a `string`, that includes `""`, whitespace, a 1 MB blob, control characters, and the full text of *Moby Dick*. For an `int`, that includes `0`, negatives, and `int.MaxValue`. For a `Guid`, that includes the id of a different entity. Consider a domain type when callers rely on a format, range or identity. For example, `Auth0Id` uses `Parse`/`TryParse` so callers don't have to recognise a valid id themselves (see Parsing at the boundary below). Even a single use can justify a type if a mistake would be costly. For a value checked and consumed in one place, a local guard may be clearer.
 - **Valid combinations are their own cases.** When fields are only valid together in certain combinations, every consumer has to know the rule. Examples: two nullable fields where at least one must be set, a `Status` enum plus fields that only mean something for one status, or a `bool` that decides which other fields are filled in. Model each valid combination as a case of a closed hierarchy instead:
 
   ```csharp
@@ -111,18 +111,21 @@ A rule that lives in a type is checked once, by the compiler. A rule that lives 
 
   This template targets `net10.0` (C# 14), which can't check that a `switch` covers every case. A `switch` over `ContactInfo` therefore still needs a `_ => throw new UnreachableException(...)` arm, and adding a case doesn't cause compile errors at the call sites. The rule still lives in one definition instead of in every caller. C# 15 (.NET 11) adds `closed` hierarchies and `union` types, which make the compiler check that a `switch` covers every case. When the template moves to `net11.0`, mark hierarchies like `ContactInfo` as `closed`, use `union` to combine types you don't own, and drop the discard arms.
 - **Each fact has one owner; everything else is derived.** Storing the same knowledge twice is another way to make an impossible state representable: the copies can disagree. If a value can be computed from other values, compute it rather than storing it. A record holding both `Lines` and `Total`, or a `Status` alongside the fields that determine it, can contradict itself, while a computed `Total` can't. The same applies across artifacts: the C# type owns the API contract, so the OpenAPI document and client types are generated from it, never hand-written. When a fact truly must be written twice, add a test that compares the copies so drift fails the build. This is DRY in its original sense of one authoritative representation per piece of knowledge, not "never write similar-looking code twice". Similar code is covered by "Shared code must stay simple" above.
-- **A value says what it means at the call site.** `Export(report, true)` tells the reader nothing. First, ask whether the flag should exist at all. If it only picks one branch, it is often two functions joined together (see above). If it should exist, use a two-value enum: `Export(report, Compression.Enabled)`. This also leaves room for a third case. Named arguments don't solve it, because callers can leave the name out. If the flag decides which other fields are set, use cases (above), not an enum. A `bool` is fine when the member's name already says what it means, such as `IsActive` or the result of `TryParse`. If an enum crosses the API boundary, read the enum parsing section in `README.md` first.
-- **No "remember to".** If correct use depends on calling things in a certain order, setting a property after construction, passing two same-typed arguments in the right order, or not passing a particular value, the design is relying on the caller's memory. Required inputs go in the constructor, steps that must happen together go in one method, distinct ids get distinct types so `Transfer(from, to)` can't be given an `OrderId`, and the default or zero value of a type is either valid or impossible to construct.
+- **A value says what it means at the call site.** `Export(report, true)` tells the reader nothing. First, ask whether the flag should exist at all. If it only picks one branch, it is often two functions joined together (see above). A named argument can clarify one call. If the choice needs to be clear even when callers omit the argument name, use a two-value enum: `Export(report, Compression.Enabled)`. This also leaves room for a third case. If the flag decides which other fields are set, use cases (above), not an enum. A `bool` is fine when the member's name already says what it means, such as `IsActive` or the result of `TryParse`. If an enum crosses the API boundary, read the enum parsing section in `README.md` first.
+- **No "remember to".** Put required inputs in the constructor and steps that must happen together in one method. Make the default or zero value valid or choose a representation that rules it out.
+
+  Two `AccountId` parameters reject an `OrderId`, not a reversed transfer. For one call, `Transfer(from: payerId, to: payeeId)` makes the direction visible. Wrapping those same ids as `SourceAccountId` and `DestinationAccountId` just before the call moves the possible swap into the constructors. Those types can help when debit authorization establishes the source and a payment instruction supplies the destination: later steps can preserve the roles without assigning them again.
+
 - **Model the domain, not today's caller.** If a type only has a flag or an `int?` because one function needed it, change the type to match what the domain actually is.
 
 ### Parsing at the boundary
 
 The recipe for a parsed type lives in the "Custom parsed types" section of `README.md`, and `Shared.Domain/Auth0Id.cs` is the reference implementation. Read both before writing anything that takes external input, and copy that shape rather than a description of it here. A type needs a `JsonConverter` only if it crosses JSON; one that only comes from configuration or route values does not.
 
-- **Parse, don't validate.** A parser turns loose input into a type that records what it checked. A validator checks the input and then throws that knowledge away, so every caller has to check again.
-- **Know where the edges are.** Data enters the application at a small set of edges: HTTP requests, SignalR hub arguments, message-queue consumers, responses from external APIs, rows read from the database, configuration, and files or CLI arguments. Each edge is a trust boundary: input is turned into strong types as it crosses, or rejected there with an explicit error. Everything inside works only with types that are already valid, so domain logic, services and repositories never check a format, length or range. If you find yourself checking a primitive deep inside the application, the parse belongs at the edge that value came through. For HTTP, model binding is that boundary, so a controller only ever receives valid data.
-- **Parse once, at the entry point.** That entry point may be the framework's own hook, such as `IParsable<T>` binding or a `JsonConverter` for `[FromBody]`. Code past the entry point assumes the input is valid and doesn't parse again.
-- **Never act on partially-valid input.** All failures happen during parsing, before any work starts.
+- **Parse external input once, at the edge.** Turn the whole input into domain types or reject it with an explicit error before acting on any of it. Pass the typed values inward so callers don't repeat format, length or range checks. A well-formed order can still fail if an item is out of stock.
+
+  Edges include HTTP requests, SignalR hub arguments, queue messages, external API responses, database rows, configuration, files and CLI arguments. For HTTP, use `IParsable<T>` model binding for route values or a `JsonConverter` for a parsed type in a `[FromBody]` payload.
+
 - **Keep the published schema honest.** A parsed type must still be documented as the `string`/`integer` it is on the wire, or every generated client changes. Don't guess what Swashbuckle will do; check it. See `MapType<Auth0Id>` and `Auth0IdParameterFilter` in `Shared.Host/Swagger/` (route values bound through `TryParse` need the filter too), `RespectRequiredConstructorParameters` and the enum converter in `DefaultOptions` (`Shared.Host/HostBuilder.cs`), and the tests in `Shared.Host.Test/ResponseModelTest.cs` and `IsDocumentedAsAStringInSwagger` in `Shared.Host.Test/ParsedTypeTest.cs`.
 
 ## State and effects you can see
@@ -138,20 +141,18 @@ The recipe for a parsed type lives in the "Custom parsed types" section of `READ
 
 # Enforcing the rules
 
-Enforce a rule at the earliest point that can catch it, in this order:
+Prefer the earliest check that expresses the rule clearly:
 
-1. **The type system.** Breaking the rule is a compiler error. Examples: a strongly typed id, a record with no public setters, `Results<...>` instead of `IActionResult`, a parsed type instead of a validated `string`. This is always the first choice. See "Abstractions that carry the rules" above.
+1. **The type system.** When a rule fits a type or method signature, the compiler can catch misuse at every call. Examples: a strongly typed id, a record with no public setters, `Results<...>` instead of `IActionResult`, a parsed type instead of a validated `string`. See "Abstractions that carry the rules" above.
 2. **An analyzer or banned symbol.** When the rule is "never call X", `BannedSymbols.txt` or an existing analyzer turns it into a build error.
 3. **An architecture test.** When the rule spans types and the compiler can't express it — "every id lives in this namespace and has a private `Guid` constructor", "domain types have no public setters", "every endpoint declares its authorization" — add a reflection-based test to `Shared.Host.Test/ArchitectureTest.cs`. A convention that only lives in a README or in review comments will eventually be broken; a test that names the offending type won't let it.
-4. **A runtime guard**, only when none of the above can reach it, with a comment stating the invariant so the next person knows it's deliberate.
+4. **A runtime guard.** Check the value where the relevant facts are known. A guard is often the clearest choice for a rule that depends on runtime state or applies in just one place. Explain the invariant in a comment when the reason for the check isn't apparent.
 
-When writing an architecture test:
+For test naming and verification, see [Tests](#tests). When writing an architecture test:
 
-- **Name it after the rule and point at why it exists** (the README section, or the code that depends on it), so whoever trips it knows whether to fix their type or question the rule.
-- **Collect every violation and assert on the list** (`Assert.Empty(violations)`), so the failure names each offending type instead of stopping at the first.
-- **Guard against passing vacuously.** A reflection query that silently finds nothing after a refactor makes every rule pass. Keep `ReflectionFindsTheTypesTheRulesAreCheckedAgainst` asserting that a known type is discovered, and extend it when you add a query over a new set of types.
-- **Don't add a rule with nothing to check yet.** A test over zero types proves nothing; add it alongside the first type it applies to.
-- **Break it once.** Add a type that violates the rule, watch the test fail with a useful message, then remove it — the same "check both directions" rule as any other test.
+- **Explain why the rule exists.** Point to the README section or the code that depends on it, so whoever trips it knows whether to fix the type or question the rule.
+- **Report every offending type.** Collect all violations and assert on the list (`Assert.Empty(violations)`). Temporarily add a violating type, check that the failure names it, then remove it.
+- **Guard against empty reflection results.** Add a rule alongside the first type it applies to. When a rule queries a new set of types, extend `ReflectionFindsTheTypesTheRulesAreCheckedAgainst` to assert that it discovers a known type.
 
 # Tests
 
